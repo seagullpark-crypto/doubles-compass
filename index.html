@@ -233,50 +233,121 @@ async function saveDoc(coll,obj,delay=0){
   const key=coll+'/'+obj.id;
   clearTimeout(writeTimers[key]);
   writeTimers[key]=setTimeout(()=>{
+    delete writeTimers[key];
     const body=JSON.parse(JSON.stringify(obj));delete body.id;
-    writeChains[key]=(writeChains[key]||Promise.resolve()).then(()=>S.db.collection(coll).doc(obj.id).set(body)).catch(e=>{
-      if(e&&e.code==='invalid_argument'){S.readonly=true;toast('保存できませんでした。この共有は閲覧のみの可能性があります');}
-      else if(e&&e.code==='quota_exceeded'){toast('保存容量の上限です。古い記録を削除してください');}
-      else toast('保存に失敗しました。通信を確認してください');
-    });
+    // Firestore は書き込み順を自分で守り、オフライン中は端末に貯めて後で送る
+    S.db.collection(coll).doc(obj.id).set(body).catch(syncError);
   },delay);
   onData();
+}
+function syncError(e){
+  const c=e&&e.code||'';
+  if(c==='permission-denied')toast('同期できませんでした。チームコードを確認してください');
+  else if(c==='resource-exhausted')toast('今日の同期の上限に達しました。明日また同期されます');
+  else toast('同期に失敗しました。通信を確認してください');
 }
 async function delDoc(coll,id){
   S.data[coll]=S.data[coll].filter(x=>x.id!==id);
   if(S.mode==='local'){lsSet(LS_KEY,S.data);onData();return}
-  try{await S.db.collection(coll).doc(id).delete()}catch(e){toast('削除に失敗しました')}
+  S.db.collection(coll).doc(id).delete().catch(syncError);
   onData();
 }
+
+/* ============ チーム同期（Firebase） ============ */
+// Firebase コンソールの「ウェブアプリ」の設定値。未設定なら同期機能は準備中として表示する
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyCQl1Yv6GXloB8ZDZPA_2h3aX8EcKSdWdA",
+  authDomain:"doubles-compass.firebaseapp.com",
+  projectId:"doubles-compass",
+  storageBucket:"doubles-compass.firebasestorage.app",
+  messagingSenderId:"131076971008",
+  appId:"1:131076971008:web:847155e8c801005ed956e5"
+};
+const FB_VER='10.12.2';
+const TEAM_KEY='fk-team-code';
+let unsubs=[];
+function loadScript(src){return new Promise((ok,ng)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=ng;document.head.appendChild(s)})}
+async function firebaseReady(){
+  if(window.firebase&&firebase.apps.length)return firebase;
+  for(const m of ['app','auth','firestore'])await loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-${m}-compat.js`);
+  firebase.initializeApp(FIREBASE_CONFIG);
+  try{await firebase.firestore().enablePersistence({synchronizeTabs:true})}catch(e){}
+  return firebase;
+}
+function newTeamCode(){
+  const A='ABCDEFGHJKMNPQRSTUVWXYZ23456789';const r=new Uint32Array(16);crypto.getRandomValues(r);
+  return [0,1,2,3].map(g=>[0,1,2,3].map(i=>A[r[g*4+i]%A.length]).join('')).join('-');
+}
+function normCode(s){return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/(.{4})(?=.)/g,'$1-')}
+async function startTeam(code){
+  const fb=await firebaseReady();
+  if(!fb.auth().currentUser)await fb.auth().signInAnonymously();
+  const fs=fb.firestore();
+  S.team=code;S.db={collection:c=>fs.collection('teams/'+code+'/'+c)};S.mode='team';
+  unsubs.forEach(u=>u());unsubs=[];
+  const delivered=new Set(),confirmed=new Set();
+  S.ready=false;S.slow=false;
+  const timer=setTimeout(()=>{S.ready=true;S.slow=confirmed.size<COLLS.length;render()},10000);
+  COLLS.forEach(coll=>{
+    unsubs.push(S.db.collection(coll).onSnapshot({includeMetadataChanges:true},snap=>{
+      const local=new Map(S.data[coll].map(x=>[x.id,x]));
+      S.data[coll]=snap.docs.map(d=>{
+        const body=Object.assign({id:d.id},d.data());
+        const mine=local.get(d.id);
+        // まだ送っていない手元の編集は、手元の版を優先
+        if(mine&&writeTimers[coll+'/'+d.id]&&mine.updatedAt>(body.updatedAt||''))return mine;
+        return body;
+      });
+      delivered.add(coll);
+      if(snap.metadata.fromCache)confirmed.delete(coll);else confirmed.add(coll);
+      if(delivered.size===COLLS.length&&!S.ready){S.ready=true}
+      if(confirmed.size===COLLS.length){S.slow=false;clearTimeout(timer)}
+      onData();
+    },e=>{clearTimeout(timer);S.ready=true;syncError(e);onData()}));
+  });
+}
+async function createTeam(){
+  const code=newTeamCode();
+  const local=JSON.parse(JSON.stringify(S.data));
+  await startTeam(code);
+  lsSet(TEAM_KEY,code);
+  // この端末の記録をそのままチームに引き継ぐ
+  for(const c of COLLS)for(const x of local[c])await saveDoc(c,x);
+  toast('チームを作りました。コードを他の監督に伝えてください');render();
+}
+async function joinTeam(raw){
+  const code=normCode(raw);
+  if(code.replace(/-/g,'').length!==16){toast('チームコードは16文字です');return}
+  const local=JSON.parse(JSON.stringify(S.data));
+  const hadLocal=COLLS.some(c=>local[c].some(x=>!x.sample));
+  S.data={players:[],pairs:[],matches:[],reflections:[],checks:[]};
+  await startTeam(code);
+  lsSet(TEAM_KEY,code);
+  if(hadLocal){S.pendingMerge=local}
+  toast('チームに参加しました');render();
+}
+async function mergeLocalIntoTeam(){
+  const local=S.pendingMerge;S.pendingMerge=null;if(!local)return;
+  let n=0;for(const c of COLLS)for(const x of local[c]){if(x.sample)continue;if(!S.data[c].some(y=>y.id===x.id)){await saveDoc(c,x);n++}}
+  toast(`この端末の記録を${n}件チームに追加しました`);render();
+}
+function leaveTeam(){
+  unsubs.forEach(u=>u());unsubs=[];
+  lsSet(LS_KEY,S.data);
+  try{localStorage.removeItem(TEAM_KEY)}catch(e){}
+  S.team=null;S.db=null;S.mode='local';
+  toast('チームから抜けました。記録はこの端末に残っています');render();
+}
 async function initStore(){
-  // PWA版：データはこの端末に保存。共有はバックアップファイルの受け渡しで行う
-  const c=null,db=null;
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
-  if(db){
-    S.db=db;S.mode='db';
-    const pending=new Set(COLLS);
-    const timer=setTimeout(()=>{if(!S.ready){S.ready=true;S.slow=true;render()}},10000);
-    COLLS.forEach(coll=>{
-      db.collection(coll).onSnapshot(snap=>{
-        const local=new Map(S.data[coll].map(x=>[x.id,x]));
-        S.data[coll]=snap.docs.map(d=>{
-          const body=Object.assign({id:d.id},d.data());
-          const mine=local.get(d.id);
-          // 自分が編集中の文書は手元の新しい版を優先
-          if(mine&&writeTimers[coll+'/'+d.id]&&mine.updatedAt>(body.updatedAt||''))return mine;
-          return body;
-        });
-        if(!snap.metadata.fromCache)pending.delete(coll);
-        if(pending.size===0&&!S.ready){S.ready=true;S.slow=false;clearTimeout(timer)}
-        onData();
-      },err=>{S.ready=true;clearTimeout(timer);toast('データを読み込めませんでした');onData()});
-    });
-    c.use('sample').then(s=>{S.sample=s;if(S.ready)render()}).catch(()=>{});
-  }else{
-    S.mode='local';S.ready=true;
-    const d=lsGet(LS_KEY,null);
-    if(d)COLLS.forEach(k=>S.data[k]=d[k]||[]);
+  const d=lsGet(LS_KEY,null);
+  if(d)COLLS.forEach(k=>S.data[k]=d[k]||[]);
+  const code=lsGet(TEAM_KEY,'');
+  if(code&&FIREBASE_CONFIG){
+    try{await startTeam(code);render();return}
+    catch(e){toast('チームに接続できません。端末の記録を表示します')}
   }
+  S.mode='local';S.ready=true;
   render();
 }
 let renderQueued=false;
@@ -380,7 +451,7 @@ function go(r){route=r;lsSet('fk-route',r);window.scrollTo(0,0);render()}
 function renderTabs(){
   $('#tabs').innerHTML=TABS.map(([k,l])=>`<button type="button" data-go="${k}" ${route===k?'aria-current="page"':''}>${l}</button>`).join('');
   const pill=$('#modePill');
-  pill.textContent=S.mode==='db'?(S.slow?'チーム共有（接続待ち）':'チーム共有'):S.mode==='local'?'この端末に保存':'接続中…';
+  pill.textContent=S.mode==='team'?(S.slow?'オフライン（あとで同期）':'チーム同期中'):S.mode==='local'?'この端末に保存':'接続中…';
 }
 function render(){
   renderTabs();
@@ -393,6 +464,11 @@ function render(){
 const after={};
 
 function modeBanner(){
+  if(S.mode==='team'){
+    if(S.pendingMerge)return `<div class="banner"><span>この端末に、チームに入る前の記録があります。チームに追加しますか？</span><button class="btn small primary" id="mergeLocal">チームに追加</button><button class="btn small" id="skipMerge">追加しない</button></div>`;
+    if(S.slow)return `<div class="banner warn">電波がないため、記録はこの端末に貯めています。つながると自動で同期されます。</div>`;
+    return '';
+  }
   if(S.mode==='local'){
     const last=lsGet('fk-backup-at','');const days=last?Math.floor((Date.now()-new Date(last))/864e5):null;
     const has=COLLS.some(k=>S.data[k].some(x=>!x.sample));
@@ -767,11 +843,12 @@ after.words=()=>{const q=$('#wq');q&&q.addEventListener('input',()=>{UI.wq=q.val
 let NP={name:'',pos:'後衛',grade:''};
 function vTeam(){
   let h=modeBanner();
-  h+=`<section class="block"><div><div class="eyebrow">TEAM</div><h2>選手</h2><p class="lead">監督も選手も、それぞれのスマホにこのアプリを入れて使います。記録は下の「データの受け渡し」でファイルを送り合うと一つにまとまります。</p></div>
+  h+=`<section class="block"><div><div class="eyebrow">TEAM</div><h2>選手</h2><p class="lead">監督も選手も、それぞれのスマホにこのアプリを入れて使います。下の「チーム同期」で同じチームコードを入れると、全員の記録が自動でそろいます。</p></div>
    <label class="f" style="max-width:360px">チーム名（この端末での表示）<input type="text" id="tm-name" value="${esc(UI.teamName)}" placeholder="例：〇〇高校ソフトテニス部"></label>
    <div class="card" style="display:flex;flex-direction:column;gap:10px"><h3 style="margin:0">選手を追加</h3><div class="grid g3"><label class="f">名前<input type="text" id="np-name" value="${esc(NP.name)}" placeholder="例：田中"></label><label class="f">学年・メモ<input type="text" id="np-grade" value="${esc(NP.grade)}" placeholder="例：2年"></label><div><div class="eyebrow">主なポジション</div>${chips('np-pos',['前衛','後衛'],NP.pos)}</div></div><div class="row"><button class="btn primary" id="addPlayer">追加</button></div></div></section>`;
   const pl=S.data.players;
   h+=`<section class="block"><h3>登録選手（${pl.length}）</h3>${pl.length?`<div class="list">${pl.map(p=>{const rc=S.data.reflections.filter(r=>r.player===p.id).length;return `<div class="item"><span><b>${esc(p.name)}</b> <span class="tag">${esc(p.pos||'')}</span> <span class="muted" style="font-size:13px">${esc(p.grade||'')}・振り返り${rc}件</span></span><button class="btn small danger" data-delplayer="${p.id}">削除</button></div>`}).join('')}</div>`:'<p class="muted">まだ選手がいません。</p>'}</section>`;
+  h+=teamSection();
   h+=`<section class="block"><h3>データの受け渡し・バックアップ</h3>
    <p class="muted" style="font-size:13px;margin:0">記録はこの端末に保存されます。機種変更に備えて定期的に書き出してください。監督と選手でデータを合わせるときは、書き出したファイルをLINEやAirDropで送り、相手の端末で「読み込む」を押します。同じ記録は新しいほうに更新され、相手の記録は消えません。</p>
    <div class="row"><button class="btn primary" id="exportData">ファイルに書き出す</button><button class="btn" id="importBtn">ファイルから読み込む</button><input type="file" id="importFile" accept="application/json,.json" hidden></div>
@@ -783,7 +860,7 @@ function vTeam(){
 }
 after.team=()=>{
   const b=(id,fn)=>{const el=$('#'+id);if(el)el.addEventListener('input',()=>fn(el.value))};
-  b('np-name',v=>NP.name=v);b('np-grade',v=>NP.grade=v);b('tm-name',v=>{UI.teamName=v;lsSet('fk-team',v)});
+  b('np-name',v=>NP.name=v);b('np-grade',v=>NP.grade=v);b('joinCode',v=>JOIN_CODE=v);b('tm-name',v=>{UI.teamName=v;lsSet('fk-team',v)});
 };
 
 /* ============ AI（Claude）への相談 ============ */
@@ -924,6 +1001,29 @@ function chipClick(name,val){
 }
 window.addEventListener('hashchange',()=>{const r=location.hash.replace('#','');if(TABS.some(t=>t[0]===r))go(r)});
 
+/* ============ チーム同期の画面 ============ */
+let JOIN_CODE='';
+function teamSection(){
+  let body;
+  if(S.mode==='team'){
+    body=`<div class="card" style="display:flex;flex-direction:column;gap:8px"><span class="eyebrow">チームコード</span>
+      <span class="mono" style="font-size:22px;font-weight:700;letter-spacing:.06em">${esc(S.team)}</span>
+      <div class="row"><button class="btn small" data-copy="${esc(S.team)}">コードをコピー</button></div>
+      <p class="muted" style="font-size:12px;margin:0">このコードを入れた端末どうしで、選手・試合・振り返り・チェックが自動でそろいます。<b>コードはチームの鍵です。</b>監督と選手以外には教えないでください。</p></div>
+      <details><summary>チームから抜ける</summary><p class="muted" style="font-size:13px">この端末は同期をやめ、今の記録を端末に残します。チームのデータは消えません。</p><button class="btn danger" id="leaveTeam">チームから抜ける</button></details>`;
+  }else if(!FIREBASE_CONFIG){
+    body=`<p class="muted" style="font-size:13px;margin:0">同期機能は準備中です（管理者がサーバーの設定を終えると使えるようになります）。それまではファイルの受け渡しで記録をそろえてください。</p>`;
+  }else{
+    body=`<div class="grid g2">
+      <div class="card" style="display:flex;flex-direction:column;gap:8px"><h3 style="margin:0">チームに参加する</h3><p class="muted" style="font-size:13px;margin:0">ほかの監督から受け取った16文字のコードを入れます。</p>
+        <input type="text" id="joinCode" value="${esc(JOIN_CODE)}" placeholder="例：K7QM-2XPA-9HTW-R4NB" autocapitalize="characters" autocomplete="off" spellcheck="false">
+        <button class="btn primary" id="joinTeam" style="align-self:flex-start">参加する</button></div>
+      <div class="card" style="display:flex;flex-direction:column;gap:8px"><h3 style="margin:0">新しいチームを作る</h3><p class="muted" style="font-size:13px;margin:0">最初の1人だけが行います。この端末の記録はそのままチームに引き継がれます。</p>
+        <button class="btn" id="createTeam" style="align-self:flex-start">チームを作る</button></div></div>`;
+  }
+  return `<section class="block"><h3>チーム同期</h3>${body}</section>`;
+}
+
 /* ============ PWA：インストール・バックアップ ============ */
 let installEvt=null;
 const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -951,19 +1051,26 @@ async function exportData(){
 async function importData(file){
   let j;try{j=JSON.parse(await file.text())}catch(e){toast('ファイルを読み取れませんでした');return}
   if(!j||j.app!=='doubles-compass'||!j.data){toast('ダブルス・コンパスのファイルではありません');return}
-  let added=0,updated=0;
+  let added=0,updated=0;const changed=[];
   COLLS.forEach(k=>{(j.data[k]||[]).forEach(x=>{if(!x||!x.id)return;
     const i=S.data[k].findIndex(y=>y.id===x.id);
-    if(i<0){S.data[k].push(x);added++}
-    else if((x.updatedAt||'')>(S.data[k][i].updatedAt||'')){S.data[k][i]=x;updated++}
+    if(i<0){S.data[k].push(x);added++;changed.push([k,x])}
+    else if((x.updatedAt||'')>(S.data[k][i].updatedAt||'')){S.data[k][i]=x;updated++;changed.push([k,x])}
   })});
   if(!UI.teamName&&j.team){UI.teamName=j.team;lsSet('fk-team',j.team)}
-  lsSet(LS_KEY,S.data);toast(`読み込みました（追加${added}件・更新${updated}件）`);render();
+  if(S.mode==='team'){for(const [k,x] of changed)await saveDoc(k,x)}
+  else lsSet(LS_KEY,S.data);
+  toast(`読み込みました（追加${added}件・更新${updated}件）`);render();
 }
 document.addEventListener('click',async e=>{
   const t=e.target.closest('button');if(!t)return;
   if(t.id==='exportData')exportData();
   if(t.id==='importBtn')$('#importFile').click();
+  if(t.id==='createTeam'){t.disabled=true;try{await createTeam()}catch(err){t.disabled=false;toast('チームを作れませんでした。通信を確認してください')}}
+  if(t.id==='joinTeam'){t.disabled=true;try{await joinTeam(JOIN_CODE)}catch(err){t.disabled=false;toast('参加できませんでした。通信を確認してください')}}
+  if(t.id==='leaveTeam')leaveTeam();
+  if(t.id==='mergeLocal')mergeLocalIntoTeam();
+  if(t.id==='skipMerge'){S.pendingMerge=null;render()}
   if(t.id==='installApp'&&installEvt){installEvt.prompt();await installEvt.userChoice;installEvt=null;render()}
 });
 document.addEventListener('change',e=>{if(e.target.id==='importFile'&&e.target.files[0]){importData(e.target.files[0]);e.target.value=''}});

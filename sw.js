@@ -1,7 +1,7 @@
 // ダブルス・コンパス Service Worker
 // アプリ本体は先に保存し、オフラインのコートでも起動できるようにする。
 // 更新したら CACHE の番号を上げる。
-const CACHE = 'doubles-compass-v1';
+const CACHE = 'doubles-compass-v3';
 const CORE = [
   './',
   './index.html',
@@ -34,6 +34,14 @@ self.addEventListener('fetch', e => {
       fetch(req)
         .then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)); return res; })
         .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  // 同期用のライブラリ（版番号付きで中身が変わらない）：保存済みを使う
+  if (url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/')) {
+    e.respondWith(
+      caches.match(req).then(hit => hit || fetch(req).then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res; }))
     );
     return;
   }
