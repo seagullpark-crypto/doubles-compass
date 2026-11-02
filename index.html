@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ダブルス・コンパス</title>
+<meta name="description" content="書籍『復元力』の考え方で、監督の試合記録と選手の振り返りをつなぐソフトテニス・ダブルス用アプリ">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1e6a54">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dコンパス">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=JetBrains+Mono:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: ベンチで片手操作できる1カラムのノート。上部にチーム名とタブ、本文はカード少なめ・罫線区切り */
+:root{
+  --bg:#f2f5f1; --surface:#ffffff; --ink:#15221e; --muted:#5b6a64; --line:#d6ddd8; --chip:#e6ece8;
+  --court:#1e6a54; --court-ink:#ffffff; --ours:#2747a6; --opp:#b0522b; --good:#2d7a47; --warn:#9a6c06;
+  --ours-soft:#e3e9fb; --opp-soft:#f8e7df; --court-soft:#dcece5;
+  --f-display:"Dela Gothic One","Hiragino Kaku Gothic StdN","Yu Gothic",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1614; --surface:#16211e; --ink:#e4ede9; --muted:#9aaba4; --line:#2a3833; --chip:#21302b;
+  --court:#3fa585; --court-ink:#07130f; --ours:#93a9ff; --opp:#e8916a; --good:#6cc48b; --warn:#e0b44a;
+  --ours-soft:#1d2645; --opp-soft:#3a2219; --court-soft:#173029; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1614; --surface:#16211e; --ink:#e4ede9; --muted:#9aaba4; --line:#2a3833; --chip:#21302b;
+  --court:#3fa585; --court-ink:#07130f; --ours:#93a9ff; --opp:#e8916a; --good:#6cc48b; --warn:#e0b44a;
+  --ours-soft:#1d2645; --opp-soft:#3a2219; --court-soft:#173029; color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+:root{padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.7}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--court)}
+.wrap{max-width:960px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{background:var(--court);color:var(--court-ink);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+header.top .wrap{padding-block:12px 0;display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand h1{font-family:var(--f-display);font-weight:400;font-size:24px;margin:0;letter-spacing:.04em}
+.brand small{opacity:.85;font-size:12px}
+.mode-pill{margin-left:auto;font-size:11px;padding:2px 10px;border-radius:99px;background:rgba(255,255,255,.18);white-space:nowrap}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin:0 -4px}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{flex:0 0 auto;background:none;border:0;color:inherit;font:inherit;font-size:14px;font-weight:500;padding:8px 12px 10px;opacity:.75;cursor:pointer;border-bottom:3px solid transparent}
+nav.tabs button[aria-current="page"]{opacity:1;border-bottom-color:currentColor}
+nav.tabs button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.chip:focus-visible{outline:2px solid var(--ours);outline-offset:2px}
+main{padding-block:20px 80px}
+h2{font-family:var(--f-display);font-weight:400;font-size:22px;margin:0 0 4px;text-wrap:balance;letter-spacing:.02em}
+h3{font-size:16px;margin:0 0 8px;font-weight:700;text-wrap:balance}
+.lead{color:var(--muted);margin:0 0 18px;font-size:14px;max-width:62ch}
+.eyebrow{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700}
+section.block{border-top:1px solid var(--line);padding-block:18px;display:flex;flex-direction:column;gap:12px}
+section.block:first-of-type{border-top:0}
+section.block > .btn{align-self:flex-start}
+section.block > label.f,.card > label.f{flex:0 0 auto}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.stat{display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-family:var(--f-mono);font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat .v small{font-size:14px;font-weight:500;color:var(--muted)}
+.stat .note{font-size:12px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);min-width:0;flex:1 1 160px}
+input[type=text],input[type=date],input[type=number],select,textarea{font:inherit;font-size:15px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+textarea{min-height:72px;resize:vertical}
+.btn{font:inherit;font-size:14px;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer}
+.btn.primary{background:var(--court);color:var(--court-ink);border-color:var(--court)}
+.btn.ghost{background:transparent}
+.btn.small{font-size:12px;padding:4px 10px}
+.btn.danger{color:var(--opp)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:13px;padding:5px 11px;border-radius:99px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer;line-height:1.4}
+.chip[aria-pressed="true"]{background:var(--court);border-color:var(--court);color:var(--court-ink)}
+.chip.ours[aria-pressed="true"]{background:var(--ours);border-color:var(--ours);color:var(--surface)}
+.chip.opp[aria-pressed="true"]{background:var(--opp);border-color:var(--opp);color:var(--surface)}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:99px;background:var(--chip);color:var(--muted)}
+.tag.ours{background:var(--ours-soft);color:var(--ours)}
+.tag.opp{background:var(--opp-soft);color:var(--opp)}
+.tag.court{background:var(--court-soft);color:var(--court)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.list{display:flex;flex-direction:column}
+.list .item{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);min-width:0;flex-wrap:wrap}
+.list .item:last-child{border-bottom:0}
+.empty{border:1px dashed var(--line);border-radius:10px;padding:18px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.banner{font-size:13px;padding:10px 12px;border-radius:8px;background:var(--court-soft);color:var(--ink);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.banner.warn{background:var(--opp-soft)}
+/* scoreboard */
+.board{background:var(--ink);color:var(--bg);border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+.board .side{display:flex;flex-direction:column;gap:2px;min-width:0}
+.board .side.r{text-align:right;align-items:flex-end}
+.board .nm{font-size:13px;opacity:.8;overflow-wrap:anywhere}
+.board .gm{font-family:var(--f-display);font-size:44px;line-height:1}
+.board .mid{text-align:center;font-family:var(--f-mono);font-size:13px;opacity:.85}
+.board .pt{font-family:var(--f-mono);font-size:26px;font-weight:700;opacity:1;display:block}
+.bigbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bigbtns button{font:inherit;font-family:var(--f-display);font-size:24px;padding:18px 8px;border-radius:12px;border:0;cursor:pointer;color:var(--surface)}
+.bigbtns .win{background:var(--ours)}
+.bigbtns .lose{background:var(--opp)}
+.trail{display:flex;gap:3px;flex-wrap:wrap}
+.trail i{width:10px;height:18px;border-radius:2px;display:block}
+.trail i.w{background:var(--ours)}
+.trail i.l{background:var(--opp)}
+.trail i.sep{width:2px;background:var(--line)}
+.endcard{border:2px solid var(--court);border-radius:12px;padding:16px;background:var(--surface);display:flex;flex-direction:column;gap:10px}
+.endcard .one{font-family:var(--f-display);font-size:20px;line-height:1.5;color:var(--court)}
+.rv{display:flex;flex-direction:column;gap:6px}
+.rv label{display:flex;gap:8px;align-items:flex-start;font-size:14px}
+.verdict{font-weight:700;padding:8px 12px;border-radius:8px}
+.verdict.go{background:var(--court-soft);color:var(--court)}
+.verdict.mid{background:var(--chip)}
+.verdict.stop{background:var(--opp-soft);color:var(--opp)}
+/* charts */
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--f-body);font-size:11px}
+.chart .axis{stroke:var(--line)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.bar{height:10px;border-radius:99px;background:var(--chip);overflow:hidden;display:flex}
+.bar > span{display:block;height:100%}
+table.t{border-collapse:collapse;width:100%;font-size:13px}
+table.t th,table.t td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+table.t td.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+.check-cat{display:flex;flex-direction:column;gap:4px}
+.check-cat label{display:flex;gap:8px;align-items:flex-start;font-size:14px;padding:3px 0}
+.check-cat .hint{font-size:12px;color:var(--muted);border-left:3px solid var(--court);padding-left:8px;margin-top:2px}
+.phrase{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.phrase .bad{color:var(--opp);text-decoration:line-through;text-decoration-thickness:1px}
+.phrase .good{color:var(--court);font-weight:700}
+.phrase .arrow{color:var(--muted)}
+@media (max-width:520px){.phrase{grid-template-columns:1fr}.phrase .arrow{display:none}}
+.stepper{display:flex;align-items:center;gap:6px}
+.stepper .mono{min-width:2ch;text-align:center;font-size:18px;font-weight:700}
+.stepper button{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:18px;cursor:pointer}
+.ai-out{white-space:pre-wrap;font-size:14px;background:var(--court-soft);border-radius:8px;padding:12px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
+.quote{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+details summary{cursor:pointer;font-weight:700;font-size:14px}
+@media (prefers-reduced-motion:no-preference){.endcard{animation:pop .25s ease-out}@keyframes pop{from{transform:scale(.98);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <h1>ダブルス・コンパス</h1>
+      <small>崩れても、ふたりで同じ方向に戻れるペアへ</small>
+      <span class="mode-pill" id="modePill">接続中…</span>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="画面"></nav>
+  </div>
+</header>
+<main class="wrap" id="view" aria-live="polite"></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* ============ 書籍『復元力』に基づく定義 ============ */
+const END_OPTS=[
+  {k:'前衛が決めた',w:1},{k:'後衛が決めた',w:1},{k:'相手のミス',w:1},
+  {k:'前衛のミス',w:0},{k:'後衛のミス',w:0},{k:'相手に決められた',w:0}
+];
+const MISS={
+  '設計':{d:'そもそも選択がズレたミス',fix:'打ち方ではなく、選び方を直す。「その一本で何を起こしたかった？」',q:'今、何をしたかった？'},
+  '実行':{d:'選択は合っているが出力が足りなかったミス',fix:'同じねらいを「幅」をもって成立させる。強度を一段下げて同じねらいを続ける',q:'同じボールが来たら、同じ選択をする？'},
+  '情報':{d:'球質・状況の読み違いによるミス',fix:'ボールより先に、相手の構え・打点・面を見る',q:'相手の何を見て決めた？'},
+  '成長':{d:'挑戦の中で起きた前向きなミス',fix:'「挑戦の代償」と意味づけする。ただし回数と場面は管理する',q:'今のミスは挑戦したミス？ 怖がったミス？'}
+};
+const FMODE={'守る':'流れを保つ','待つ':'判断を整える','消す':'選択肢を奪う','仕掛ける':'点を取りにいく'};
+const BMODE={'続ける':'ラリーを続ける（土台）','変える':'展開を変える','時間':'時間をつくる','主導権':'主導権を奪いにいく'};
+const SIGNS=['ロブが増えた','相手のボールが浅い','相手の打点が下がった','相手前衛が動けない','相手の配球が偏った'];
+const RALLY=['自分の返球が深い（安定している）','相手後衛が浅くなってきた・ロブが増えた','相手前衛が動けていない','自分は余裕のある体勢で打てている','味方前衛が関与できる位置にいる'];
+const CHECK=[
+  {c:'判断設計',sub:'迷ったときに戻れるか',hint:'「正解を探す」のではなく「戻り先を減らしているか」',items:['苦しい場面で「最優先する判断」が決まっている','ミスをしても「判断の良し悪し」を切り分けて振り返れている','結果が悪くても「今やるべきこと」を言語化できる','試合中、「考え直す項目」が多すぎない','迷ったときに「戻る選択肢」が一つ決まっている']},
+  {c:'技術再現性',sub:'気持ちが揺れても技術が出るか',hint:'技術を「完成度」ではなく「耐久性」で見ているか',items:['緊張時・疲労時でも「使える技術」が明確になっている','フォームが崩れても「成立する技術」を持っている','成功率ではなく「戻りやすさ」で技術を評価している','一番うまくいった形を「固定」しすぎていない','ミスを「幅を広げる情報」として扱えている']},
+  {c:'ペア関係',sub:'一人で抱え込まない構造か',hint:'信頼を「気持ち」ではなく「役割と判断の共有」として扱えているか',items:['自分の「役割」とペアの「役割」を明確に理解している','失点時に「誰のせいか」を探さない','苦しい場面で「任せ合える設計」になっている','ペア間で「共通の判断基準」がある','試合中に「余計な確認」が増えていない']},
+  {c:'戦術理解',sub:'意味づけができているか',hint:'戦術を「当たった」「外れた」で終わらせていないか',items:['今の配球や動きの「意図」を説明できる','点を取れなくても「戦術が効いているか」を判断できる','前衛・後衛の役割を「判断」で理解している','相手の「変化」に気づけている','「なぜそれを続けるか」が共有されている']},
+  {c:'認知整理',sub:'見えている世界が整理されているか',hint:'「見えていないこと」に気づかせているか',items:['相手の次の行動を「予測」しようとしている','ボールだけでなく「人」を見ている','焦る場面ほど「視野」が狭くなっていない','自分の「状態（焦り・迷い）」に早く気づける','判断のスピードが落ちたことを「自覚」できる']}
+];
+const RULE_PRESETS=['迷ったら、深さを優先する','迷ったら、相手前衛を消すのを優先する','迷ったら、クロスで時間をつくる','迷ったら、前衛がギリギリ触れる高さを優先する','ミドルの勢いのない浅いボールは前衛優先','ミドルの深いボール・ロブ処理は後衛優先','サイドパスは近い人優先、遠い人はカバー優先','2本整えてから勝負'];
+const AIKOTOBA_PRESETS=['戻ろう','基本で','いつもの形','まず1本','任せた','いくよ','ミドルOK','ロブある','2本だけ','深く1本'];
+const PHRASES=[
+  {bad:'今のは出られただろう？',good:'今は出ない判断でOK',why:'結果論で責めると、判断が過去に縛られて次の一歩が遅れる'},
+  {bad:'前衛なんだからいけ！',good:'次は、浮いたらいこう',why:'出る条件を一つだけ渡すと、迷いが減って出られるボールが増える'},
+  {bad:'（存在が）消えているぞ',good:'今の構え、相手は嫌がっているよ',why:'前衛の評価は得点数ではなく相手の不自由さ'},
+  {bad:'もっと動け！',good:'今は静かに立っていていい',why:'流れが悪いときほど、前衛は情報量を減らす仕事をしている'},
+  {bad:'気持ちで負けるな／ビビるな',good:'崩れたら、あの順番に戻ろう',why:'感情はいじらず、行動の選択肢を残す'},
+  {bad:'切り替えろ',good:'今やることは一つ。反省はあとで',why:'切り替えではなく「時間の分離」でメンタルをつくる'},
+  {bad:'自信を持て',good:'そのミスは想定内',why:'自信は状態で揺れる。信頼は構造で残る'},
+  {bad:'大丈夫、大丈夫',good:'次は深く1本',why:'何が大丈夫かわからない励ましは、不安を増やすことがある'},
+  {bad:'次、決めよう',good:'決めるのはあと。相手を苦しくするのが先',why:'取り返したい気持ちの強打は成功率が落ちる'},
+  {bad:'ミスするな',good:'取り返さなくていい。取り返せる場所に戻ろう',why:'ミスを消す指導は技術の幅を奪う'},
+  {bad:'思い切っていけ／もっと踏み込め',good:'今はここまででいい。一本だけ深く',why:'恐怖の中では選択肢が多いほど動けない。行動を固定する'},
+  {bad:'お前が弱い／集中しろ',good:'（ペアに）今、余裕ある？ 次、戻そうよ',why:'ペア競技ではまず関係性の崩れ（視線・声・役割）を見る'}
+];
+const SITUATIONS=[
+  {s:'連続失点・流れが悪い',w:['今じゃない。形を戻そう','流れは止められる。テンポを変えよう','深さで整えよう','今は静かに立っていていい（前衛へ）']},
+  {s:'前衛が出られない',w:['出られる形をつくろう','出るのは最後。まずは触れる位置にいよう','今日は迷わせ役でいい','今はまだ仕掛けない。条件が揃ったら出よう']},
+  {s:'後衛が苦しい・調子が悪い日',w:['勝ちにいくより、崩れないで','まず一本、同じボールを続けよう','一回、時間をつくろう','無理をしないのは弱さではなく、勝つための判断']},
+  {s:'ペアがズレたとき',w:['ズレたら、ここに戻ろう','最初の約束に戻ろう','任せるよ、役割通りで','（区切りで）次は、これだけ合わせよう']},
+  {s:'エンドチェンジ',w:['やることは一つ','今の場面、僕は○○が見えていた','相手が変えるまで、自分は変えない','次、主導権とるよ']},
+  {s:'停滞期・怪我からの復帰',w:['今日は変わらなかった。でも壊れなかった','努力は直線ではない。基準線を見よう','今はここまででいい','居場所はある。今日は記録係をお願い']}
+];
+
+/* ============ ストア（チーム共有DB／端末内保存） ============ */
+const COLLS=['players','pairs','matches','reflections','checks'];
+const S={mode:'init',db:null,sample:null,data:{players:[],pairs:[],matches:[],reflections:[],checks:[]},ready:false,loadedAt:{},readonly:false};
+const LS_KEY='fukugen-note-v1';
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+const writeTimers={},writeChains={};
+async function saveDoc(coll,obj,delay=0){
+  if(!obj.id)obj.id=uid();
+  obj.updatedAt=new Date().toISOString();
+  const list=S.data[coll];const i=list.findIndex(x=>x.id===obj.id);
+  if(i>=0)list[i]=obj;else list.push(obj);
+  if(S.mode==='local'){lsSet(LS_KEY,S.data);onData();return}
+  const key=coll+'/'+obj.id;
+  clearTimeout(writeTimers[key]);
+  writeTimers[key]=setTimeout(()=>{
+    const body=JSON.parse(JSON.stringify(obj));delete body.id;
+    writeChains[key]=(writeChains[key]||Promise.resolve()).then(()=>S.db.collection(coll).doc(obj.id).set(body)).catch(e=>{
+      if(e&&e.code==='invalid_argument'){S.readonly=true;toast('保存できませんでした。この共有は閲覧のみの可能性があります');}
+      else if(e&&e.code==='quota_exceeded'){toast('保存容量の上限です。古い記録を削除してください');}
+      else toast('保存に失敗しました。通信を確認してください');
+    });
+  },delay);
+  onData();
+}
+async function delDoc(coll,id){
+  S.data[coll]=S.data[coll].filter(x=>x.id!==id);
+  if(S.mode==='local'){lsSet(LS_KEY,S.data);onData();return}
+  try{await S.db.collection(coll).doc(id).delete()}catch(e){toast('削除に失敗しました')}
+  onData();
+}
+async function initStore(){
+  // PWA版：データはこの端末に保存。共有はバックアップファイルの受け渡しで行う
+  const c=null,db=null;
+  try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+  if(db){
+    S.db=db;S.mode='db';
+    const pending=new Set(COLLS);
+    const timer=setTimeout(()=>{if(!S.ready){S.ready=true;S.slow=true;render()}},10000);
+    COLLS.forEach(coll=>{
+      db.collection(coll).onSnapshot(snap=>{
+        const local=new Map(S.data[coll].map(x=>[x.id,x]));
+        S.data[coll]=snap.docs.map(d=>{
+          const body=Object.assign({id:d.id},d.data());
+          const mine=local.get(d.id);
+          // 自分が編集中の文書は手元の新しい版を優先
+          if(mine&&writeTimers[coll+'/'+d.id]&&mine.updatedAt>(body.updatedAt||''))return mine;
+          return body;
+        });
+        if(!snap.metadata.fromCache)pending.delete(coll);
+        if(pending.size===0&&!S.ready){S.ready=true;S.slow=false;clearTimeout(timer)}
+        onData();
+      },err=>{S.ready=true;clearTimeout(timer);toast('データを読み込めませんでした');onData()});
+    });
+    c.use('sample').then(s=>{S.sample=s;if(S.ready)render()}).catch(()=>{});
+  }else{
+    S.mode='local';S.ready=true;
+    const d=lsGet(LS_KEY,null);
+    if(d)COLLS.forEach(k=>S.data[k]=d[k]||[]);
+  }
+  render();
+}
+let renderQueued=false;
+function onData(){
+  if(renderQueued)return;renderQueued=true;
+  requestAnimationFrame(()=>{renderQueued=false;
+    const ae=document.activeElement;
+    if(ae&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)&&document.getElementById('view').contains(ae)){pendingRender=true;return}
+    render();
+  });
+}
+let pendingRender=false;
+document.addEventListener('focusout',()=>{if(pendingRender){setTimeout(()=>{const ae=document.activeElement;if(!(ae&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName))){pendingRender=false;render()}},50)}});
+
+/* ============ ユーティリティ ============ */
+const $=s=>document.querySelector(s);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2600)}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function pct(a,b){return b?Math.round(a/b*100):null}
+function fmtPct(v){return v==null?'—':v+'<small>%</small>'}
+function byDate(a,b){return (a.date||'').localeCompare(b.date||'')||(a.updatedAt||'').localeCompare(b.updatedAt||'')}
+function playerName(id){const p=S.data.players.find(x=>x.id===id);return p?p.name:'（不明）'}
+function pairName(id){const p=S.data.pairs.find(x=>x.id===id);return p?p.name:'（未設定ペア）'}
+function chips(name,opts,val,cls=''){
+  return '<div class="chips" role="group">'+opts.map(o=>{const k=typeof o==='string'?o:o.k;const lab=typeof o==='string'?o:(o.label||o.k);
+    return `<button type="button" class="chip ${cls}" data-chip="${esc(name)}" data-val="${esc(k)}" aria-pressed="${val===k||(Array.isArray(val)&&val.includes(k))}">${esc(lab)}</button>`}).join('')+'</div>';
+}
+
+/* ============ 試合のスコア計算と指標 ============ */
+function score(points,total){
+  const need=Math.ceil((total||7)/2);let gA=0,gB=0,pA=0,pB=0,game=0,done=false;const per=[];const gameEnds=[];
+  const isFinal=()=>gA===need-1&&gB===need-1;
+  for(const p of points){
+    if(done){per.push(-1);continue}
+    per.push(game);
+    if(p.w)pA++;else pB++;
+    const tgt=isFinal()?7:4;
+    if((pA>=tgt||pB>=tgt)&&Math.abs(pA-pB)>=2){
+      if(pA>pB)gA++;else gB++;
+      gameEnds.push({idx:per.length-1,won:pA>pB,gA,gB});
+      pA=pB=0;game++;
+      if(gA>=need||gB>=need)done=true;
+    }
+  }
+  return {gA,gB,pA,pB,game,per,done,final:isFinal()&&!done,need,gameEnds};
+}
+function callText(sc){
+  if(sc.done)return '試合終了';
+  if(sc.final)return 'ファイナル '+sc.pA+'-'+sc.pB;
+  const {pA,pB}=sc;
+  if(pA>=3&&pB>=3){if(pA===pB)return 'デュース';return pA>pB?'アドバンテージ（自）':'アドバンテージ（相）'}
+  return pA+'-'+pB;
+}
+function isOwnMiss(p){return p.end==='前衛のミス'||p.end==='後衛のミス'}
+function metrics(points){
+  const m={n:points.length,won:0,streaks:[],afterMiss:0,afterMissWon:0,miss:{'設計':0,'実行':0,'情報':0,'成長':0,'未分類':0},
+    f:{},b:{},signs:0,signByType:{},ownMiss:0};
+  let run=0;
+  points.forEach((p,i)=>{
+    if(p.w){m.won++;if(run>0){m.streaks.push(run);run=0}}else run++;
+    if(isOwnMiss(p)){m.ownMiss++;m.miss[p.miss||'未分類']++;
+      if(i+1<points.length){m.afterMiss++;if(points[i+1].w)m.afterMissWon++}}
+    if(p.f){m.f[p.f]=m.f[p.f]||{n:0,w:0};m.f[p.f].n++;if(p.w)m.f[p.f].w++}
+    if(p.b){m.b[p.b]=m.b[p.b]||{n:0,w:0};m.b[p.b].n++;if(p.w)m.b[p.b].w++}
+    (p.s||[]).forEach(s=>{m.signs++;m.signByType[s]=(m.signByType[s]||0)+1});
+  });
+  if(run>0)m.streaks.push(run);
+  m.stop2=m.streaks.length?pct(m.streaks.filter(l=>l<=2).length,m.streaks.length):null;
+  m.maxStreak=m.streaks.length?Math.max(...m.streaks):0;
+  m.recov=m.afterMiss?pct(m.afterMissWon,m.afterMiss):null;
+  m.winRate=pct(m.won,m.n);
+  return m;
+}
+/* エンドチェンジで伝える「ひとつだけ」 — 書籍の原則に基づく判定 */
+function oneThing(points,pair){
+  const recent=points.slice(-12);const m=metrics(recent);
+  let tail=0;for(let i=points.length-1;i>=0&&!points[i].w;i--)tail++;
+  const shikakeLoss=recent.filter(p=>p.f==='仕掛ける'&&!p.w).length;
+  const out=[];
+  if(tail>=3)out.push({t:'流れは止められる。高さでテンポを変え、前衛は静かに立つ',why:`${tail}連続失点中。流れは変えにいくものではなく、落ち着くのを待つもの`});
+  if(m.miss['設計']>=2)out.push({t:'選び方を一つに決める：「迷ったら深さ」',why:`直近で設計ミスが${m.miss['設計']}本。打ち方ではなく選び方を直す`});
+  if(m.miss['実行']>=2)out.push({t:'ねらいは合っている。強度を一段下げて、同じねらいを続けよう',why:`実行ミスが${m.miss['実行']}本。発想は正しい。再現できる強度へ`});
+  if(m.miss['情報']>=2)out.push({t:'ボールより先に、相手の構えを見る',why:`情報ミスが${m.miss['情報']}本。「開いた！」「被った！」のひとり言で読む`});
+  if(shikakeLoss>=2)out.push({t:'今はまだ仕掛けない。条件が揃ったら出よう',why:'仕掛けた場面での失点が続いている。待つ前衛が判断の起点'});
+  if(m.signs>=4&&m.winRate!=null&&m.winRate<50)out.push({t:'相手は不自由になっている。同じ問いを投げ続けよう',why:`相手の不自由サインが${m.signs}回。崩れは変化より蓄積で起きる`});
+  if(m.miss['成長']>=1&&!out.length)out.push({t:'今のミスは挑戦の代償。回数を決めて続けよう',why:'成長ミスは悪いミスではない。ただし無制限には許さない'});
+  if(!out.length){
+    if(m.winRate!=null&&m.winRate>=55)out.push({t:'相手が変えるまで、自分たちは変えない',why:'有利な条件は続ける。変えるべきは相手が慣れた瞬間'});
+    else out.push({t:pair&&pair.modoru?('戻る形：'+pair.modoru):'深さで整えて、2本整えてから勝負',why:'迷ったら、決めてある形へ戻る'});
+  }
+  return out[0];
+}
+
+/* ============ 画面 ============ */
+const TABS=[['home','ホーム'],['match','試合記録'],['reflect','振り返り'],['pair','ペア設計'],['check','メンタル設計'],['words','声かけ'],['team','選手']];
+let route=(location.hash||'').replace('#','')||lsGet('fk-route','home');
+if(!TABS.some(t=>t[0]===route))route='home';
+const UI={matchId:null,analysisId:null,reflId:null,reflPlayer:null,checkPlayer:null,checkBy:'本人',pairId:null,lastTagIdx:null,showEnd:false,teamName:lsGet('fk-team','')};
+function go(r){route=r;lsSet('fk-route',r);window.scrollTo(0,0);render()}
+function renderTabs(){
+  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button type="button" data-go="${k}" ${route===k?'aria-current="page"':''}>${l}</button>`).join('');
+  const pill=$('#modePill');
+  pill.textContent=S.mode==='db'?(S.slow?'チーム共有（接続待ち）':'チーム共有'):S.mode==='local'?'この端末に保存':'接続中…';
+}
+function render(){
+  renderTabs();
+  const v=$('#view');
+  if(!S.ready){v.innerHTML='<p class="muted">チームのデータを読み込んでいます…</p>';return}
+  const fn={home:vHome,match:vMatch,reflect:vReflect,pair:vPair,check:vCheck,words:vWords,team:vTeam}[route];
+  v.innerHTML=fn();
+  after[route]&&after[route]();
+}
+const after={};
+
+function modeBanner(){
+  if(S.mode==='local'){
+    const last=lsGet('fk-backup-at','');const days=last?Math.floor((Date.now()-new Date(last))/864e5):null;
+    const has=COLLS.some(k=>S.data[k].some(x=>!x.sample));
+    if(has&&(days==null||days>=7))return `<div class="banner warn"><span>記録はこの端末に保存されています。${days==null?'まだバックアップがありません。':days+'日間バックアップしていません。'}</span><button class="btn small" data-go="team">バックアップする</button></div>`;
+    return '';
+  }
+  if(S.slow)return `<div class="banner warn">共有データにまだ接続できていません。表示が古い可能性があります。</div>`;
+  return '';
+}
+function isEmpty(){return !S.data.players.length&&!S.data.matches.length&&!S.data.reflections.length}
+
+/* ---------- ホーム ---------- */
+function vHome(){
+  const ms=S.data.matches.slice().sort(byDate);
+  const all=[].concat(...ms.map(m=>m.points||[]));
+  const M=metrics(all);
+  const refl=S.data.reflections.slice().sort(byDate);
+  let h=modeBanner();
+  h+=`<section class="block"><div><div class="eyebrow">TEAM RESILIENCE</div><h2>${esc(UI.teamName||'チームの復元力')}</h2>
+  <p class="lead">勝敗だけでは見えない「崩れてから戻る力」を数字にします。強いペアはミスをしないペアではなく、ズレても同じ判断基準に戻ってこられるペアです。</p></div>`;
+  if(isEmpty()){
+    h+=`<div class="empty"><b>まだ記録がありません</b>
+      <span>① 選手タブで選手を登録 → ② ペア設計で「戻り道カード」を作成 → ③ 試合記録で1ポイントずつタップ → ④ 選手が振り返りを書く、の順に使います。</span>
+      <div class="row"><button class="btn primary" data-go="team">選手を登録する</button><button class="btn" id="loadSample">サンプルデータで試す</button></div>
+      <span style="font-size:12px">サンプルは名前に「例）」が付き、選手タブからまとめて削除できます。</span></div>`;
+  }
+  h+=`<div class="grid g4">
+    ${statCard('連続失点ストップ率',fmtPct(M.stop2),'失点の連鎖を2点以内で止めた割合')}
+    ${statCard('ミス後の復帰率',fmtPct(M.recov),'自分たちのミスの直後のポイントを取った割合')}
+    ${statCard('相手の不自由サイン',M.signs+'<small>回</small>','前衛の評価は得点数ではなく相手の不自由さ')}
+    ${statCard('記録ポイント',M.n+'<small>本</small>',`${ms.length}試合・取得率 ${M.winRate==null?'—':M.winRate+'%'}`)}
+  </div></section>`;
+  h+=`<section class="block"><div class="grid g2">
+    <div class="card"><h3>監督：試合を記録する</h3><p class="muted" style="margin:0 0 10px;font-size:13px">ベンチで1ポイントずつタップ。ミスの種類と役割モードを残すと、エンドチェンジで伝える「ひとつだけ」を提案します。</p><button class="btn primary" data-go="match">試合記録へ</button></div>
+    <div class="card"><h3>選手：自分のプレーを振り返る</h3><p class="muted" style="margin:0 0 10px;font-size:13px">結果ではなく過程を記録。「崩れて戻れた回数」の基準線が少しずつ上がっていくのを確かめます。</p><button class="btn primary" data-go="reflect">振り返りへ</button></div>
+  </div></section>`;
+  if(all.length){
+    h+=`<section class="block"><h3>ミスの内訳 <span class="muted" style="font-weight:400;font-size:13px">同じアウトでも意味は全部違う</span></h3>${missBar(M)}
+    <div class="grid g2">${modeTable('前衛モード別の取得率',M.f,FMODE)}${modeTable('後衛モード別の取得率',M.b,BMODE)}</div></section>`;
+    h+=`<section class="block"><h3>試合ごとの復元力</h3><div class="scroll"><table class="t"><thead><tr><th>日付</th><th>ペア</th><th>相手</th><th>スコア</th><th>ストップ率</th><th>ミス後復帰</th><th></th></tr></thead><tbody>
+    ${ms.slice().reverse().map(m=>{const sc=score(m.points||[],m.games);const mm=metrics(m.points||[]);
+      return `<tr><td>${esc(m.date)}</td><td>${esc(pairName(m.pairId))}</td><td>${esc(m.opponent||'')}</td><td class="n">${sc.gA}-${sc.gB}</td><td class="n">${mm.stop2==null?'—':mm.stop2+'%'}</td><td class="n">${mm.recov==null?'—':mm.recov+'%'}</td><td><button class="btn small" data-analysis="${m.id}">分析</button></td></tr>`}).join('')}
+    </tbody></table></div></section>`;
+  }
+  if(refl.length){
+    const recent=refl.slice(-4).reverse();
+    h+=`<section class="block"><h3>最近の振り返り</h3><div class="list">${recent.map(r=>`<div class="item"><div style="min-width:0"><b>${esc(playerName(r.player))}</b> <span class="muted mono" style="font-size:12px">${esc(r.date)}</span><div style="font-size:14px">次の一つ：${esc(r.next||'—')}</div></div>${r.coach?'<span class="tag court">監督コメントあり</span>':'<span class="tag">コメント待ち</span>'}</div>`).join('')}</div><button class="btn" data-go="reflect">すべて見る</button></section>`;
+  }
+  return h;
+}
+function statCard(k,v,note){return `<div class="card stat"><span class="k">${k}</span><span class="v">${v}</span><span class="note">${note}</span></div>`}
+const MISS_COL={'設計':'var(--opp)','実行':'var(--warn)','情報':'var(--ours)','成長':'var(--good)','未分類':'var(--line)'};
+function missBar(M){
+  const tot=Object.values(M.miss).reduce((a,b)=>a+b,0);
+  if(!tot)return '<p class="muted" style="margin:0">自分たちのミスはまだ記録されていません。</p>';
+  return `<div class="bar" style="height:14px">${Object.entries(M.miss).filter(e=>e[1]).map(([k,v])=>`<span title="${k}ミス ${v}" style="width:${v/tot*100}%;background:${MISS_COL[k]}"></span>`).join('')}</div>
+  <div class="legend">${Object.entries(M.miss).filter(e=>e[1]).map(([k,v])=>`<span style="--c:${MISS_COL[k]}">${k}${k==='未分類'?'':'ミス'} ${v}</span>`).join('')}</div>
+  <div class="grid g2" style="font-size:13px">${Object.entries(MISS).map(([k,o])=>`<div><b>${k}ミス</b>：${o.d}<br><span class="muted">対応：${o.fix}</span></div>`).join('')}</div>`;
+}
+function modeTable(title,obj,defs){
+  return `<div class="card"><h3>${title}</h3><table class="t"><tbody>${Object.keys(defs).map(k=>{const o=obj[k]||{n:0,w:0};const r=pct(o.w,o.n);
+    return `<tr><td><b>${k}</b> <span class="muted" style="font-size:12px">${defs[k]}</span></td><td class="n">${o.n}本</td><td class="n">${r==null?'—':r+'%'}</td></tr>`}).join('')}</tbody></table></div>`;
+}
+
+/* ---------- 試合記録 ---------- */
+let NEW_MATCH={date:today(),pairId:'',opponent:'',games:7,recorder:''};
+function curMatch(){return S.data.matches.find(m=>m.id===UI.matchId)}
+function vMatch(){
+  if(UI.analysisId)return vAnalysis();
+  const m=curMatch();
+  if(!m||m.finished)return vMatchStart();
+  const sc=score(m.points,m.games);
+  const pair=S.data.pairs.find(p=>p.id===m.pairId);
+  let h=modeBanner();
+  h+=`<div class="board" aria-label="スコア">
+    <div class="side"><span class="nm">${esc(pairName(m.pairId))}</span><span class="gm">${sc.gA}</span></div>
+    <div class="mid">第${sc.game+1}ゲーム<span class="pt">${callText(sc)}</span>${sc.need*2-1}ゲームマッチ</div>
+    <div class="side r"><span class="nm">${esc(m.opponent||'相手')}</span><span class="gm">${sc.gB}</span></div></div>`;
+  h+=`<div class="trail" aria-hidden="true" style="margin-top:10px">${m.points.map((p,i)=>(i>0&&sc.per[i]!==sc.per[i-1]?'<i class="sep"></i>':'')+`<i class="${p.w?'w':'l'}"></i>`).join('')}</div>`;
+  if(UI.showEnd)h+=endCard(m,sc,pair);
+  if(sc.done){
+    h+=`<section class="block"><div class="banner">試合終了（${sc.gA}-${sc.gB}）。保存して分析を見ましょう。</div><div class="row"><button class="btn primary" id="finish">試合を保存して分析へ</button><button class="btn" id="undo">最後のポイントを取り消す</button></div></section>`;
+  }else{
+    h+=`<section class="block" style="border-top:0;padding-top:14px"><div class="bigbtns"><button class="win" id="ptW">得点</button><button class="lose" id="ptL">失点</button></div>
+    <div class="row between"><button class="btn small" id="undo" ${m.points.length?'':'disabled'}>↶ 取り消す</button><span class="muted" style="font-size:12px">記録者：${esc(m.recorder||'—')}</span></div></section>`;
+  }
+  const li=m.points.length-1;
+  if(li>=0&&!UI.showEnd){
+    const p=m.points[li];
+    const endOpts=END_OPTS.filter(o=>o.w===p.w).map(o=>o.k);
+    h+=`<section class="block"><div class="row between"><h3 style="margin:0">直前のポイントにタグ <span class="tag ${p.w?'ours':'opp'}">${p.w?'得点':'失点'}・${li+1}本目</span></h3><span class="muted" style="font-size:12px">任意。次をタップすると確定</span></div>
+      <div><div class="eyebrow">決着</div>${chips('end',endOpts,p.end,p.w?'ours':'opp')}</div>
+      ${isOwnMiss(p)?`<div><div class="eyebrow">ミスの種類</div>${chips('miss',Object.keys(MISS).map(k=>({k,label:k+'ミス'})),p.miss)}<p class="muted" style="font-size:12px;margin:4px 0 0">${p.miss?esc(MISS[p.miss].q)+' → '+esc(MISS[p.miss].fix):'迷ったら本人に「'+MISS['設計'].q+'」と聞いてみる'}</p></div>`:''}
+      <div class="grid g2"><div><div class="eyebrow">前衛のモード</div>${chips('f',Object.keys(FMODE),p.f)}</div><div><div class="eyebrow">後衛のモード</div>${chips('b',Object.keys(BMODE),p.b)}</div></div>
+      <div><div class="eyebrow">相手の不自由サイン（前衛が効いている証拠）</div>${chips('s',SIGNS,p.s||[])}</div></section>`;
+  }
+  h+=`<section class="block"><h3>ラリーを続ける価値 <span class="muted" style="font-weight:400;font-size:13px">各1点・合計0〜5点</span></h3><div class="rv">${RALLY.map((r,i)=>`<label><input type="checkbox" id="rv${i}" data-rv="${i}" ${UI.rv&&UI.rv[i]?'checked':''}> ${r}</label>`).join('')}</div><div id="rvOut">${rallyVerdict()}</div></section>`;
+  h+=`<section class="block"><h3>ズレ・ログ <span class="muted" style="font-weight:400;font-size:13px">試合中は直さない。区切りで扱う</span></h3>
+    <div class="row"><input type="text" id="zureIn" placeholder="例：ロブが上がったとき、前衛と後衛が両方下がった" style="flex:1 1 220px"><button class="btn" id="zureAdd">記録</button></div>
+    ${(m.zure||[]).length?`<div class="list">${m.zure.map((z,i)=>`<div class="item"><span style="min-width:0">${z.done?'<s class="muted">':''}${esc(z.t)}${z.done?'</s>':''} <span class="muted mono" style="font-size:11px">第${z.g+1}G</span></span><button class="btn small" data-zure="${i}">${z.done?'戻す':'扱った'}</button></div>`).join('')}</div>`:''}
+  </section>`;
+  if(pair)h+=`<section class="block"><h3>このペアの戻り道</h3>${pairSummary(pair)}</section>`;
+  h+=`<section class="block"><div class="row"><button class="btn" id="showEnd">エンドチェンジカードを表示</button><button class="btn ghost danger" id="abort">記録を中断（保存は残る）</button></div></section>`;
+  return h;
+}
+function rallyVerdict(){
+  const n=(UI.rv||[]).filter(Boolean).length;
+  if(n>=4)return `<div class="verdict go">${n}点：続ける。深さ優先・高さを混ぜ・相手の苦しい場所へ戻す</div>`;
+  if(n>=2)return `<div class="verdict mid">${n}点：状況次第。1本だけ続けて様子を見る</div>`;
+  return `<div class="verdict stop">${n}点：続けない。ロブで時間をつくる／コースを変えて相手前衛を動かす</div>`;
+}
+function endCard(m,sc,pair){
+  const o=oneThing(m.points,pair);
+  const lastEnd=sc.gameEnds[sc.gameEnds.length-1];
+  const z=(m.zure||[]).filter(x=>!x.done);
+  return `<section class="block" style="border-top:0"><div class="endcard" role="dialog" aria-label="エンドチェンジカード">
+    <div class="eyebrow">END CHANGE ・ ${sc.gA}-${sc.gB}${lastEnd?(lastEnd.won?' ・ 直前のゲームを取得':' ・ 直前のゲームを失った'):''}</div>
+    <div class="muted" style="font-size:13px">伝えるのは、ひとつだけ。</div>
+    <div class="one">${esc(o.t)}</div>
+    <div class="quote">${esc(o.why)}</div>
+    ${pair&&pair.aikotoba&&pair.aikotoba.length?`<div><span class="eyebrow">合言葉</span><div class="chips">${pair.aikotoba.map(a=>`<span class="tag court" style="font-size:13px">${esc(a)}</span>`).join('')}</div></div>`:''}
+    ${z.length?`<div><span class="eyebrow">ズレ・ログ（区切りで扱う）</span><ul style="margin:4px 0 0;padding-left:18px">${z.map(x=>`<li>${esc(x.t)}</li>`).join('')}</ul><div class="muted" style="font-size:12px">原因追及ではなく「次は、これだけ合わせよう」を一つだけ決める。</div></div>`:''}
+    <div class="row"><button class="btn primary" id="closeEnd">次のゲームへ</button>${S.sample?'<button class="btn" id="aiEnd">AIに声かけ案を聞く</button>':''}</div>
+    <div id="aiEndOut"></div>
+  </div></section>`;
+}
+function vMatchStart(){
+  const pairs=S.data.pairs;
+  const open=S.data.matches.filter(m=>!m.finished).sort(byDate).reverse();
+  let h=modeBanner();
+  h+=`<section class="block"><div><div class="eyebrow">BENCH</div><h2>試合を記録する</h2><p class="lead">1ポイントごとに「得点／失点」をタップし、余裕があれば決着・ミスの種類・役割モードを付けます。奇数ゲーム終了ごとにエンドチェンジカードが出ます。</p></div>
+  <div class="grid g2">
+    <label class="f">日付<input type="date" id="nm-date" value="${esc(NEW_MATCH.date)}"></label>
+    <label class="f">自チームのペア<select id="nm-pair"><option value="">選択してください</option>${pairs.map(p=>`<option value="${p.id}" ${NEW_MATCH.pairId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>
+    <label class="f">相手ペア・学校<input type="text" id="nm-opp" value="${esc(NEW_MATCH.opponent)}" placeholder="例：〇〇高校 A・B"></label>
+    <label class="f">試合形式<select id="nm-games">${[5,7,9].map(g=>`<option value="${g}" ${+NEW_MATCH.games===g?'selected':''}>${g}ゲームマッチ</option>`).join('')}</select></label>
+    <label class="f">記録者<input type="text" id="nm-rec" value="${esc(NEW_MATCH.recorder)}" placeholder="監督／マネージャー／離脱中の選手"></label>
+  </div>
+  ${pairs.length?'':'<div class="banner">先に「ペア設計」でペアを作ると、戻り道や合言葉が試合中に表示されます。</div>'}
+  <div class="row"><button class="btn primary" id="startMatch">記録を始める</button></div>
+  <p class="muted" style="font-size:12px;margin:0">怪我で練習に入れない選手も、記録係としてチームに居場所を持てます。</p></section>`;
+  if(open.length)h+=`<section class="block"><h3>記録途中の試合</h3><div class="list">${open.map(m=>`<div class="item"><span>${esc(m.date)} ${esc(pairName(m.pairId))} vs ${esc(m.opponent||'')}（${(m.points||[]).length}本）</span><button class="btn small" data-resume="${m.id}">再開</button></div>`).join('')}</div></section>`;
+  const done=S.data.matches.filter(m=>m.finished).sort(byDate).reverse();
+  if(done.length)h+=`<section class="block"><h3>記録済みの試合</h3><div class="list">${done.map(m=>{const sc=score(m.points||[],m.games);return `<div class="item"><span>${esc(m.date)} ${esc(pairName(m.pairId))} vs ${esc(m.opponent||'')} <b class="mono">${sc.gA}-${sc.gB}</b></span><button class="btn small" data-analysis="${m.id}">分析</button></div>`}).join('')}</div></section>`;
+  return h;
+}
+function vAnalysis(){
+  const m=S.data.matches.find(x=>x.id===UI.analysisId);
+  if(!m){UI.analysisId=null;return vMatchStart()}
+  const pts=m.points||[];const sc=score(pts,m.games);const M=metrics(pts);
+  let h=`<section class="block"><button class="btn small" id="backList">← 試合一覧</button>
+  <div><div class="eyebrow">${esc(m.date)} ・ ${sc.need*2-1}ゲームマッチ</div><h2>${esc(pairName(m.pairId))} vs ${esc(m.opponent||'相手')}　<span class="mono">${sc.gA}-${sc.gB}</span></h2></div>
+  <div class="grid g4">${statCard('連続失点ストップ率',fmtPct(M.stop2),'最長連続失点 '+M.maxStreak+'本')}${statCard('ミス後の復帰率',fmtPct(M.recov),'ミス直後 '+M.afterMiss+'本中 '+M.afterMissWon+'本取得')}${statCard('相手の不自由サイン',M.signs+'<small>回</small>',topSign(M))}${statCard('ポイント取得率',fmtPct(M.winRate),M.won+' / '+M.n+'本')}</div></section>`;
+  h+=`<section class="block"><h3>ゲームの流れ</h3>${flowChart(pts,sc)}<div class="legend"><span style="--c:var(--ours)">得点</span><span style="--c:var(--opp)">失点</span><span style="--c:var(--muted)">累積差（得点−失点）</span></div></section>`;
+  h+=`<section class="block"><h3>ミスの内訳</h3>${missBar(M)}</section>`;
+  h+=`<section class="block"><div class="grid g2">${modeTable('前衛モード',M.f,FMODE)}${modeTable('後衛モード',M.b,BMODE)}</div></section>`;
+  if((m.zure||[]).length)h+=`<section class="block"><h3>ズレ・ログ</h3><ul style="margin:0;padding-left:18px">${m.zure.map(z=>`<li>${esc(z.t)} <span class="muted mono" style="font-size:11px">第${z.g+1}G</span></li>`).join('')}</ul><p class="muted" style="font-size:13px;margin:0">ペアで「次は、これだけ合わせよう」を一つ決め、ペア設計の迷ったらルールに追加しましょう。</p></section>`;
+  h+=`<section class="block"><h3>監督メモ</h3><textarea id="am-note" placeholder="試合後に伝えること（技術→判断→認知の順で、気持ちには最後に触れる）">${esc(m.note||'')}</textarea><div class="row"><button class="btn primary" id="saveNote">メモを保存</button>${S.sample?'<button class="btn" id="aiMatch">AIに試合の見立てを聞く</button>':''}<button class="btn ghost danger" id="delMatch">この試合を削除</button></div><div id="aiMatchOut"></div></section>`;
+  return h;
+}
+function topSign(M){const e=Object.entries(M.signByType).sort((a,b)=>b[1]-a[1])[0];return e?'最多：'+e[0]:'記録なし'}
+function flowChart(pts,sc){
+  if(!pts.length)return '<p class="muted">ポイントがありません。</p>';
+  const W=640,H=180,pad=28;const n=pts.length;const step=(W-pad*2)/Math.max(n,1);
+  let cum=0;const cums=pts.map(p=>cum+=p.w?1:-1);
+  const mx=Math.max(3,...cums.map(Math.abs));const y=v=>H/2-(v/mx)*(H/2-pad);
+  let bars='',line='';
+  pts.forEach((p,i)=>{const x=pad+i*step;bars+=`<rect x="${x+step*.15}" y="${p.w?H-pad-14:H-pad-6}" width="${Math.max(step*.7,1)}" height="${p.w?14:6}" fill="${p.w?'var(--ours)':'var(--opp)'}" rx="1"/>`});
+  line=cums.map((v,i)=>`${i?'L':'M'}${(pad+i*step+step/2).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  let seps='';sc.gameEnds.forEach((g,k)=>{const x=pad+(g.idx+1)*step;seps+=`<line x1="${x}" x2="${x}" y1="${pad-10}" y2="${H-pad}" class="axis" stroke-dasharray="2 3"/><text x="${x-step*0}" y="${pad-14}" text-anchor="end">${g.gA}-${g.gB}</text>`});
+  return `<div class="scroll"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="ポイントの流れ"><line x1="${pad}" x2="${W-pad}" y1="${y(0)}" y2="${y(0)}" class="axis"/>${seps}${bars}<path d="${line}" fill="none" stroke="var(--muted)" stroke-width="2"/><circle cx="${pad+(n-1)*step+step/2}" cy="${y(cums[n-1])}" r="4" fill="var(--ink)"/><text x="${pad}" y="${H-6}">1本目</text><text x="${W-pad}" y="${H-6}" text-anchor="end">${n}本目</text></svg></div>`;
+}
+after.match=()=>{
+  const m=curMatch();
+  const bindNM=(id,k)=>{const el=$('#'+id);if(el)el.addEventListener('input',()=>NEW_MATCH[k]=el.value)};
+  bindNM('nm-date','date');bindNM('nm-pair','pairId');bindNM('nm-opp','opponent');bindNM('nm-games','games');bindNM('nm-rec','recorder');
+  const zi=$('#zureIn');if(zi)zi.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#zureAdd').click()}});
+};
+
+/* ---------- ペア設計 ---------- */
+let PAIR_DRAFT=null;
+function newPairDraft(){return {name:'',front:'',back:'',owners:{quality:'後衛',entry:'前衛',hard:'後衛',air:'前衛'},rules:['迷ったら、深さを優先する'],modoru:'',aikotoba:['戻ろう','まず1本'],kuzure:{back:'まず深さと高さで「時間」をつくる',front:'まず「消す」「触る」で関与する',both:'合言葉で基本に戻す（会話しない）'},customRule:'',customWord:''}}
+function pairSummary(p){
+  return `<div class="grid g2" style="font-size:14px">
+   <div><div class="eyebrow">判断の所有者</div>ラリーの質：<b>${esc(p.owners.quality)}</b>／仕掛けの入口：<b>${esc(p.owners.entry)}</b><br>苦しい時間の耐え方：<b>${esc(p.owners.hard)}</b>／空気の転換：<b>${esc(p.owners.air)}</b></div>
+   <div><div class="eyebrow">戻る形</div>${esc(p.modoru||'—')}</div>
+   <div><div class="eyebrow">迷ったらルール</div><ul style="margin:0;padding-left:18px">${(p.rules||[]).map(r=>`<li>${esc(r)}</li>`).join('')}</ul></div>
+   <div><div class="eyebrow">崩れたときのルール</div>後衛：${esc(p.kuzure.back)}<br>前衛：${esc(p.kuzure.front)}<br>二人：${esc(p.kuzure.both)}</div>
+  </div>`;
+}
+function vPair(){
+  let h=modeBanner();
+  h+=`<section class="block"><div><div class="eyebrow">PAIR DESIGN</div><h2>戻り道カード</h2><p class="lead">信頼は気持ちではなく構造。「どちらが判断するか」「迷ったら何を優先するか」「崩れたらどこに戻るか」を試合前に言語化しておきます。</p></div>`;
+  if(PAIR_DRAFT){h+=pairEditor();return h+'</section>'}
+  const ps=S.data.pairs;
+  if(!ps.length)h+=`<div class="empty">まだペアがありません。前衛と後衛を選んで、二人の戻り道を決めましょう。<button class="btn primary" id="newPair">ペアを作る</button></div>`;
+  else h+=`<div class="row"><button class="btn primary" id="newPair">ペアを追加</button></div>`;
+  h+='</section>';
+  ps.forEach(p=>{h+=`<section class="block"><div class="row between"><h3 style="margin:0">${esc(p.name)}</h3><div class="row"><button class="btn small" data-editpair="${p.id}">編集</button><button class="btn small danger" data-delpair="${p.id}">削除</button></div></div>
+    <div class="chips">${(p.aikotoba||[]).map(a=>`<span class="tag court" style="font-size:13px">${esc(a)}</span>`).join('')}</div>${pairSummary(p)}</section>`});
+  return h;
+}
+function pairEditor(){
+  const d=PAIR_DRAFT;const pl=S.data.players;
+  const opt=(pos,sel)=>`<option value="">—</option>`+pl.map(p=>`<option value="${p.id}" ${sel===p.id?'selected':''}>${esc(p.name)}${p.pos?'（'+esc(p.pos)+'）':''}</option>`).join('');
+  const own=(k,label)=>`<div><div class="eyebrow">${label}</div>${chips('own-'+k,['前衛','後衛'],d.owners[k])}</div>`;
+  return `<div class="card" style="display:flex;flex-direction:column;gap:14px">
+    <div class="grid g3"><label class="f">前衛<select id="pd-front">${opt('前衛',d.front)}</select></label><label class="f">後衛<select id="pd-back">${opt('後衛',d.back)}</select></label><label class="f">ペア名（空欄なら自動）<input type="text" id="pd-name" value="${esc(d.name)}" placeholder="例：田中・佐藤"></label></div>
+    <div><h3>判断の所有者</h3><div class="grid g2">${own('quality','ラリーの質（深さ・高さ・テンポ）')}${own('entry','仕掛けの入口（出る・出ないの最終判断）')}${own('hard','苦しい時間の耐え方')}${own('air','空気の転換')}</div></div>
+    <div><h3>迷ったらルール</h3>${chips('rule',RULE_PRESETS.concat(d.rules.filter(r=>!RULE_PRESETS.includes(r))),d.rules)}<div class="row" style="margin-top:8px"><input type="text" id="pd-crule" value="${esc(d.customRule)}" placeholder="自分たちのルールを追加" style="flex:1 1 200px"><button class="btn small" id="addRule">追加</button></div></div>
+    <label class="f">戻る形（苦しいときに戻る一本）<input type="text" id="pd-modoru" value="${esc(d.modoru)}" placeholder="例：クロス深く2本 → 前衛はセンターを締める"></label>
+    <div><h3>合言葉</h3>${chips('word',AIKOTOBA_PRESETS.concat(d.aikotoba.filter(r=>!AIKOTOBA_PRESETS.includes(r))),d.aikotoba)}<div class="row" style="margin-top:8px"><input type="text" id="pd-cword" value="${esc(d.customWord)}" placeholder="二人だけの合言葉" style="flex:1 1 200px"><button class="btn small" id="addWord">追加</button></div></div>
+    <div><h3>崩れたときのルール</h3><div class="grid g3"><label class="f">後衛<input type="text" id="pd-kb" value="${esc(d.kuzure.back)}"></label><label class="f">前衛<input type="text" id="pd-kf" value="${esc(d.kuzure.front)}"></label><label class="f">二人<input type="text" id="pd-k2" value="${esc(d.kuzure.both)}"></label></div></div>
+    <div class="row"><button class="btn primary" id="savePair">保存</button><button class="btn" id="cancelPair">やめる</button></div></div>`;
+}
+after.pair=()=>{
+  if(!PAIR_DRAFT)return;const d=PAIR_DRAFT;
+  const b=(id,fn)=>{const el=$('#'+id);if(el)el.addEventListener('input',()=>fn(el.value))};
+  b('pd-front',v=>d.front=v);b('pd-back',v=>d.back=v);b('pd-name',v=>d.name=v);b('pd-crule',v=>d.customRule=v);b('pd-cword',v=>d.customWord=v);
+  b('pd-modoru',v=>d.modoru=v);b('pd-kb',v=>d.kuzure.back=v);b('pd-kf',v=>d.kuzure.front=v);b('pd-k2',v=>d.kuzure.both=v);
+};
+
+/* ---------- 振り返り ---------- */
+let REFL=null;
+function newRefl(pid){const p=S.data.players.find(x=>x.id===pid);return {date:today(),player:pid||'',matchId:'',role:p?p.pos||'後衛':'後衛',nerai:'',miss:{'設計':0,'実行':0,'情報':0,'成長':0},proc:{modoreta:0,onaji:0,ippo:0},cond:{out:3,acc:3,judge:3},front:{mamoreta:'',riyuu:'',joken:''},mamotta:'',next:'',coach:''}}
+function vReflect(){
+  let h=modeBanner();
+  const pl=S.data.players;
+  if(!UI.reflPlayer&&pl.length)UI.reflPlayer=pl[0].id;
+  h+=`<section class="block"><div><div class="eyebrow">REFLECTION</div><h2>振り返り</h2><p class="lead">反省は試合中ではなく、ここでやります。結果ではなく「戻れた回数」「同じねらいに戻れた回数」「怖さを超えた一歩」を数えます。</p></div>`;
+  if(!pl.length){h+=`<div class="empty">選手が登録されていません。<button class="btn primary" data-go="team">選手を登録する</button></div></section>`;return h}
+  h+=`<label class="f" style="max-width:320px">選手<select id="rf-player">${pl.map(p=>`<option value="${p.id}" ${UI.reflPlayer===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>`;
+  if(REFL)return h+reflEditor()+'</section>';
+  h+=`<div class="row"><button class="btn primary" id="newRefl">振り返りを書く</button></div></section>`;
+  const mine=S.data.reflections.filter(r=>r.player===UI.reflPlayer).sort(byDate);
+  h+=`<section class="block"><h3>成長の基準線</h3><p class="muted" style="margin:0;font-size:13px">努力は直線ではありません。日ごとの波（点）ではなく、3回平均の基準線（線）が上がっているかを見ます。</p>${growthChart(mine)}<div class="legend"><span style="--c:var(--line)">その日の過程スコア</span><span style="--c:var(--court)">基準線（3回平均）</span></div></section>`;
+  if(mine.length){
+    const sum={'設計':0,'実行':0,'情報':0,'成長':0};mine.forEach(r=>Object.keys(sum).forEach(k=>sum[k]+=(r.miss&&r.miss[k])||0));
+    h+=`<section class="block"><h3>自分のミスの傾向</h3>${missBar({miss:Object.assign({},sum,{'未分類':0})})}</section>`;
+    h+=`<section class="block"><h3>記録</h3><div class="list">${mine.slice().reverse().map(r=>reflItem(r)).join('')}</div></section>`;
+  }else h+=`<section class="block"><div class="empty">この選手の振り返りはまだありません。試合や練習のあとに、まず「次の一つ」だけでも書いてみましょう。</div></section>`;
+  return h;
+}
+function procScore(r){const p=r.proc||{};return (p.modoreta||0)+(p.onaji||0)+(p.ippo||0)}
+function reflItem(r){
+  const mt=S.data.matches.find(m=>m.id===r.matchId);
+  return `<div class="item" style="align-items:flex-start"><div style="min-width:0;flex:1 1 260px;display:flex;flex-direction:column;gap:4px">
+    <div class="row"><span class="mono" style="font-size:13px">${esc(r.date)}</span><span class="tag">${esc(r.role)}</span>${mt?`<span class="tag ours">vs ${esc(mt.opponent||'')}</span>`:''}<span class="tag court">過程 ${procScore(r)}</span></div>
+    ${r.nerai?`<div style="font-size:14px"><span class="muted">ねらい：</span>${esc(r.nerai)}</div>`:''}
+    ${r.mamotta?`<div style="font-size:14px"><span class="muted">今日守れたもの：</span>${esc(r.mamotta)}</div>`:''}
+    <div style="font-size:14px"><span class="muted">次の一つ：</span><b>${esc(r.next||'—')}</b></div>
+    ${r.coach?`<div class="quote" style="color:var(--ink)">監督：${esc(r.coach)}</div>`:''}
+    <div id="ai-${r.id}"></div></div>
+    <div class="row"><button class="btn small" data-editrefl="${r.id}">開く</button>${S.sample?`<button class="btn small" data-airefl="${r.id}">AI声かけ案</button>`:''}</div></div>`;
+}
+function stepper(path,val){return `<div class="stepper"><button type="button" data-step="${path}" data-d="-1" aria-label="減らす">−</button><span class="mono">${val}</span><button type="button" data-step="${path}" data-d="1" aria-label="増やす">＋</button></div>`}
+function reflEditor(){
+  const r=REFL;const ms=S.data.matches.slice().sort(byDate).reverse();
+  const isF=r.role==='前衛';
+  return `<div class="card" style="display:flex;flex-direction:column;gap:16px">
+   <div class="grid g3"><label class="f">日付<input type="date" id="rf-date" value="${esc(r.date)}"></label>
+   <label class="f">試合（任意）<select id="rf-match"><option value="">練習・その他</option>${ms.map(m=>`<option value="${m.id}" ${r.matchId===m.id?'selected':''}>${esc(m.date)} vs ${esc(m.opponent||'')}</option>`).join('')}</select></label>
+   <div><div class="eyebrow">今日のポジション</div>${chips('role',['前衛','後衛'],r.role)}</div></div>
+   <label class="f">今日の「ねらい」（フォームではなく、何をしたかったか）<input type="text" id="rf-nerai" value="${esc(r.nerai)}" placeholder="例：相手後衛をベースライン後方に下げ続ける"></label>
+   <div><h3>過程のカウント</h3><div class="grid g3">
+     <div><div style="font-size:14px">崩れても戻れた回数</div>${stepper('proc.modoreta',r.proc.modoreta)}</div>
+     <div><div style="font-size:14px">同じねらいに戻れた回数</div>${stepper('proc.onaji',r.proc.onaji)}</div>
+     <div><div style="font-size:14px">怖さを超えた一歩</div>${stepper('proc.ippo',r.proc.ippo)}</div></div></div>
+   <div><h3>ミスの仕分け</h3><p class="muted" style="font-size:13px;margin:0 0 8px">ミスは落ち込む材料ではなく、次の一手を決める情報。</p><div class="grid g2">
+     ${Object.entries(MISS).map(([k,o])=>`<div><div style="font-size:14px"><b>${k}ミス</b> <span class="muted" style="font-size:12px">${o.q}</span></div>${stepper('miss.'+k,r.miss[k])}</div>`).join('')}</div></div>
+   ${isF?`<div><h3>出られなかったときの3つの問い</h3><div class="grid">
+     <label class="f">今、出なかったことで何を守れたか<input type="text" id="rf-fm" value="${esc(r.front.mamoreta)}" placeholder="例：センターを締めた／抜かれなかった"></label>
+     <label class="f">出られる条件が揃っていなかった理由は<input type="text" id="rf-fr" value="${esc(r.front.riyuu)}" placeholder="例：相手の構えが強かった／味方後衛が苦しかった"></label>
+     <label class="f">次に出るとしたら、何が揃えばいいか（一つだけ）<input type="text" id="rf-fj" value="${esc(r.front.joken)}" placeholder="例：相手後衛の身体が開いたら"></label></div></div>`
+   :`<div><h3>今日の調子（当たりではなく3つで見る）</h3><div class="grid g3">
+     ${[['out','出力（力・スピード）'],['acc','精度（深さ・コース）'],['judge','判断（選択の質）']].map(([k,l])=>`<label class="f">${l}<input type="range" min="1" max="5" id="rf-c-${k}" value="${r.cond[k]}"><span class="mono" style="font-size:12px">${r.cond[k]} / 5</span></label>`).join('')}</div>
+     <p class="muted" style="font-size:12px;margin:6px 0 0">当たりが悪い日でも勝てるが、判断が悪い日はほぼ負ける。</p></div>`}
+   <label class="f">今日守れたもの（変わらなかった日でも、壊れなかったこと）<input type="text" id="rf-mamotta" value="${esc(r.mamotta)}" placeholder="例：連続ミスのあとも深さだけは守れた"></label>
+   <label class="f">次の一つ（一つだけ）<input type="text" id="rf-next" value="${esc(r.next)}" placeholder="例：迷ったらクロス深く"></label>
+   <label class="f">監督からのひと言<textarea id="rf-coach" placeholder="評価より安全基地。行動の選択肢を増やす言葉を">${esc(r.coach)}</textarea></label>
+   <div class="row"><button class="btn primary" id="saveRefl">保存</button><button class="btn" id="cancelRefl">やめる</button>${r.id?'<button class="btn ghost danger" id="delRefl">削除</button>':''}</div></div>`;
+}
+function growthChart(list){
+  if(list.length<2)return '<p class="muted" style="font-size:13px">2回以上記録すると、基準線が表示されます。</p>';
+  const W=640,H=200,pad=30;const vals=list.map(procScore);const n=vals.length;
+  const mx=Math.max(4,...vals);const x=i=>pad+i*(W-pad*2)/(n-1);const y=v=>H-pad-(v/mx)*(H-pad*2);
+  const avg=vals.map((v,i)=>{const s=vals.slice(Math.max(0,i-2),i+1);return s.reduce((a,b)=>a+b,0)/s.length});
+  let g='';for(let t=0;t<=mx;t+=Math.ceil(mx/4)){g+=`<line x1="${pad}" x2="${W-pad}" y1="${y(t)}" y2="${y(t)}" class="axis" stroke-dasharray="2 4"/><text x="${pad-6}" y="${y(t)+4}" text-anchor="end">${t}</text>`}
+  const dots=vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="var(--surface)" stroke="var(--muted)" stroke-width="1.5"><title>${esc(list[i].date)}：${v}</title></circle>`).join('');
+  const wave=vals.map((v,i)=>`${i?'L':'M'}${x(i)},${y(v)}`).join(' ');
+  const base=avg.map((v,i)=>`${i?'L':'M'}${x(i)},${y(v)}`).join(' ');
+  const area=base+` L${x(n-1)},${H-pad} L${x(0)},${H-pad} Z`;
+  return `<div class="scroll"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="過程スコアの推移">${g}<path d="${area}" fill="var(--court-soft)"/><path d="${wave}" fill="none" stroke="var(--line)" stroke-width="1.5"/><path d="${base}" fill="none" stroke="var(--court)" stroke-width="3" stroke-linecap="round"/>${dots}<circle cx="${x(n-1)}" cy="${y(avg[n-1])}" r="5" fill="var(--court)"/><text x="${pad}" y="${H-8}">${esc(list[0].date)}</text><text x="${W-pad}" y="${H-8}" text-anchor="end">${esc(list[n-1].date)}</text></svg></div>`;
+}
+after.reflect=()=>{
+  const sel=$('#rf-player');if(sel)sel.addEventListener('change',()=>{UI.reflPlayer=sel.value;REFL=null;render()});
+  if(!REFL)return;const r=REFL;
+  const b=(id,fn)=>{const el=$('#'+id);if(el)el.addEventListener('input',()=>fn(el.value))};
+  b('rf-date',v=>r.date=v);b('rf-match',v=>r.matchId=v);b('rf-nerai',v=>r.nerai=v);b('rf-mamotta',v=>r.mamotta=v);b('rf-next',v=>r.next=v);b('rf-coach',v=>r.coach=v);
+  b('rf-fm',v=>r.front.mamoreta=v);b('rf-fr',v=>r.front.riyuu=v);b('rf-fj',v=>r.front.joken=v);
+  ['out','acc','judge'].forEach(k=>{const el=$('#rf-c-'+k);if(el)el.addEventListener('input',()=>{r.cond[k]=+el.value;el.nextElementSibling.textContent=el.value+' / 5'})});
+};
+
+/* ---------- メンタル設計チェック ---------- */
+let CHK=null;
+function vCheck(){
+  let h=modeBanner();const pl=S.data.players;
+  if(!UI.checkPlayer&&pl.length)UI.checkPlayer=pl[0].id;
+  h+=`<section class="block"><div><div class="eyebrow">MENTAL DESIGN CHECK</div><h2>メンタル設計チェックリスト</h2><p class="lead">気持ちの強さを測るものではありません。判断と行動が崩れない構造が設計されているかを確かめます。本人と監督の両方がつけると、見えている世界のズレがわかります。</p></div>`;
+  if(!pl.length)return h+`<div class="empty">選手が登録されていません。<button class="btn primary" data-go="team">選手を登録する</button></div></section>`;
+  h+=`<div class="row"><label class="f" style="max-width:280px">選手<select id="ck-player">${pl.map(p=>`<option value="${p.id}" ${UI.checkPlayer===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>
+     <div><div class="eyebrow">つける人</div>${chips('ckby',['本人','監督'],UI.checkBy)}</div></div>`;
+  if(CHK)return h+checkEditor()+'</section>';
+  h+=`<div class="row"><button class="btn primary" id="newCheck">${UI.checkBy}としてチェックする</button></div></section>`;
+  const mine=S.data.checks.filter(c=>c.player===UI.checkPlayer).sort(byDate);
+  const lastSelf=mine.filter(c=>c.by==='本人').pop(),lastCoach=mine.filter(c=>c.by==='監督').pop();
+  h+=`<section class="block"><h3>最新の設計状態</h3>${(lastSelf||lastCoach)?`<div class="grid g2"><div>${radar(lastSelf,lastCoach)}<div class="legend"><span style="--c:var(--ours)">本人${lastSelf?'（'+esc(lastSelf.date)+'）':'：未記入'}</span><span style="--c:var(--opp)">監督${lastCoach?'（'+esc(lastCoach.date)+'）':'：未記入'}</span></div></div><div>${gapList(lastSelf,lastCoach)}</div></div>`:'<div class="empty">まだチェックがありません。まず本人がつけ、次に監督がつけてみましょう。</div>'}</section>`;
+  if(mine.length)h+=`<section class="block"><h3>履歴</h3><div class="scroll"><table class="t"><thead><tr><th>日付</th><th>つけた人</th>${CHECK.map(c=>`<th>${c.c}</th>`).join('')}<th></th></tr></thead><tbody>${mine.slice().reverse().map(c=>`<tr><td>${esc(c.date)}</td><td>${esc(c.by)}</td>${CHECK.map((_,i)=>`<td class="n">${catScore(c,i)}/5</td>`).join('')}<td><button class="btn small danger" data-delcheck="${c.id}">削除</button></td></tr>`).join('')}</tbody></table></div></section>`;
+  return h;
+}
+function catScore(c,i){return (c.v&&c.v[i]||[]).filter(Boolean).length}
+function radar(a,b){
+  const W=300,H=280,cx=150,cy=140,R=100;const N=5;
+  const pt=(i,r)=>{const ang=-Math.PI/2+i*2*Math.PI/N;return [cx+Math.cos(ang)*r,cy+Math.sin(ang)*r]};
+  let g='';[1,2,3,4,5].forEach(l=>{g+=`<polygon points="${[...Array(N)].map((_,i)=>pt(i,R*l/5).join(',')).join(' ')}" fill="none" class="axis"/>`});
+  [...Array(N)].forEach((_,i)=>{const [x,y]=pt(i,R);const [lx,ly]=pt(i,R+22);g+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" class="axis"/><text x="${lx}" y="${ly+4}" text-anchor="middle">${CHECK[i].c}</text>`});
+  const poly=(c,col)=>c?`<polygon points="${CHECK.map((_,i)=>pt(i,R*catScore(c,i)/5).join(',')).join(' ')}" fill="${col}" fill-opacity=".18" stroke="${col}" stroke-width="2"/>`:'';
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" style="max-width:340px" role="img" aria-label="5領域のレーダー">${g}${poly(b,'var(--opp)')}${poly(a,'var(--ours)')}</svg>`;
+}
+function gapList(a,b){
+  const weak=[];const gaps=[];
+  CHECK.forEach((c,i)=>c.items.forEach((it,j)=>{
+    const sa=a?!!(a.v[i]||[])[j]:null,sb=b?!!(b.v[i]||[])[j]:null;
+    if(a&&b&&sa!==sb)gaps.push({c:c.c,it,self:sa});
+    if((a&&!sa)&&(b?!sb:true))weak.push({c:c.c,it,hint:c.hint});
+  }));
+  let h='';
+  if(a&&b)h+=`<h3>本人と監督で見え方が違う項目（${gaps.length}）</h3>`+(gaps.length?`<ul style="margin:0 0 12px;padding-left:18px;font-size:14px">${gaps.slice(0,6).map(g=>`<li><span class="tag">${g.c}</span> ${esc(g.it)}<br><span class="muted" style="font-size:12px">${g.self?'本人はできている、監督はまだと見ている':'監督はできている、本人はまだと感じている'}</span></li>`).join('')}</ul><p class="muted" style="font-size:12px;margin:0 0 12px">このズレが対話の入口になります。正しさを決めるより、何が見えていたかを聞く。</p>`:'<p class="muted">大きなズレはありません。</p>');
+  h+=`<h3>設計が必要な部分</h3>`+(weak.length?`<ul style="margin:0;padding-left:18px;font-size:14px">${weak.slice(0,5).map(w=>`<li><span class="tag">${w.c}</span> ${esc(w.it)}</li>`).join('')}</ul>`:'<p class="muted">すべてに□がついています。</p>');
+  return h;
+}
+function checkEditor(){
+  return `<div class="card" style="display:flex;flex-direction:column;gap:16px"><label class="f" style="max-width:200px">日付<input type="date" id="ck-date" value="${esc(CHK.date)}"></label>
+   ${CHECK.map((c,i)=>`<div class="check-cat"><h3 style="margin:0">${c.c} <span class="muted" style="font-weight:400;font-size:13px">${c.sub}</span></h3>${c.items.map((it,j)=>`<label><input type="checkbox" id="ck-${i}-${j}" data-ck="${i}-${j}" ${CHK.v[i][j]?'checked':''}> ${esc(it)}</label>`).join('')}${UI.checkBy==='監督'?`<div class="hint">指導の視点：${c.hint}</div>`:''}</div>`).join('')}
+   <p class="muted" style="font-size:12px;margin:0">全部できているかを見るものではありません。□が少ない領域が、設計が必要な部分です。</p>
+   <div class="row"><button class="btn primary" id="saveCheck">保存</button><button class="btn" id="cancelCheck">やめる</button></div></div>`;
+}
+after.check=()=>{
+  const sel=$('#ck-player');if(sel)sel.addEventListener('change',()=>{UI.checkPlayer=sel.value;CHK=null;render()});
+  if(CHK){const d=$('#ck-date');d&&d.addEventListener('input',()=>CHK.date=d.value)}
+};
+
+/* ---------- 声かけ ---------- */
+function vWords(){
+  let h=`<section class="block"><div><div class="eyebrow">COACHING WORDS</div><h2>声かけ変換帳</h2><p class="lead">声かけは心を動かす道具ではなく、行動の設計図。恐怖の中で必要なのは気合いではなく手順です。左の言葉を、右の言葉に置き換えてみてください。</p></div>
+  <input type="text" id="wq" placeholder="言葉で探す（例：前衛、切り替え、流れ）" value="${esc(UI.wq||'')}">
+  <div id="wlist">${phraseList()}</div></section>`;
+  h+=`<section class="block"><h3>場面別のひと言</h3><div class="grid g2">${SITUATIONS.map(s=>`<div class="card"><div class="eyebrow">${s.s}</div><ul style="margin:6px 0 0;padding-left:18px">${s.w.map(w=>`<li>${esc(w)} <button class="btn small ghost" data-copy="${esc(w)}" aria-label="コピー">コピー</button></li>`).join('')}</ul></div>`).join('')}</div></section>`;
+  h+=`<section class="block"><h3>ミス直後に聞く4つの質問</h3><div class="grid g2">${Object.entries(MISS).map(([k,o])=>`<div><b>「${o.q}」</b><br><span class="muted" style="font-size:13px">→ ${k}ミスかどうかがわかる。${o.fix}</span></div>`).join('')}</div></section>`;
+  h+=`<section class="block"><h3>前衛のひとり言（構え読み）</h3><div class="chips">${['（身体が）開いた！ ストレートかミドルを張りながら、浅い逃げ','（面が）被った！ ショート警戒','（テークバックが）大きい！ 強打、待て','（打点が）遅い！ 逃げ、センター締め','（足が）止まった！ 置き球、前でとる'].map(t=>`<span class="tag court" style="font-size:13px;padding:4px 10px">${t}</span>`).join('')}</div></section>`;
+  return h;
+}
+function phraseList(){
+  const q=(UI.wq||'').trim();
+  const list=PHRASES.filter(p=>!q||(p.bad+p.good+p.why).includes(q));
+  if(!list.length)return '<p class="muted">見つかりませんでした。</p>';
+  return list.map(p=>`<div class="phrase"><div><span class="eyebrow">壊す声かけ</span><div class="bad">${esc(p.bad)}</div></div><div class="arrow">→</div><div><span class="eyebrow">生かす声かけ</span><div class="good">${esc(p.good)}</div><div class="muted" style="font-size:12px">${esc(p.why)}</div></div></div>`).join('');
+}
+after.words=()=>{const q=$('#wq');q&&q.addEventListener('input',()=>{UI.wq=q.value;$('#wlist').innerHTML=phraseList()})};
+
+/* ---------- 選手 ---------- */
+let NP={name:'',pos:'後衛',grade:''};
+function vTeam(){
+  let h=modeBanner();
+  h+=`<section class="block"><div><div class="eyebrow">TEAM</div><h2>選手</h2><p class="lead">監督も選手も、それぞれのスマホにこのアプリを入れて使います。記録は下の「データの受け渡し」でファイルを送り合うと一つにまとまります。</p></div>
+   <label class="f" style="max-width:360px">チーム名（この端末での表示）<input type="text" id="tm-name" value="${esc(UI.teamName)}" placeholder="例：〇〇高校ソフトテニス部"></label>
+   <div class="card" style="display:flex;flex-direction:column;gap:10px"><h3 style="margin:0">選手を追加</h3><div class="grid g3"><label class="f">名前<input type="text" id="np-name" value="${esc(NP.name)}" placeholder="例：田中"></label><label class="f">学年・メモ<input type="text" id="np-grade" value="${esc(NP.grade)}" placeholder="例：2年"></label><div><div class="eyebrow">主なポジション</div>${chips('np-pos',['前衛','後衛'],NP.pos)}</div></div><div class="row"><button class="btn primary" id="addPlayer">追加</button></div></div></section>`;
+  const pl=S.data.players;
+  h+=`<section class="block"><h3>登録選手（${pl.length}）</h3>${pl.length?`<div class="list">${pl.map(p=>{const rc=S.data.reflections.filter(r=>r.player===p.id).length;return `<div class="item"><span><b>${esc(p.name)}</b> <span class="tag">${esc(p.pos||'')}</span> <span class="muted" style="font-size:13px">${esc(p.grade||'')}・振り返り${rc}件</span></span><button class="btn small danger" data-delplayer="${p.id}">削除</button></div>`}).join('')}</div>`:'<p class="muted">まだ選手がいません。</p>'}</section>`;
+  h+=`<section class="block"><h3>データの受け渡し・バックアップ</h3>
+   <p class="muted" style="font-size:13px;margin:0">記録はこの端末に保存されます。機種変更に備えて定期的に書き出してください。監督と選手でデータを合わせるときは、書き出したファイルをLINEやAirDropで送り、相手の端末で「読み込む」を押します。同じ記録は新しいほうに更新され、相手の記録は消えません。</p>
+   <div class="row"><button class="btn primary" id="exportData">ファイルに書き出す</button><button class="btn" id="importBtn">ファイルから読み込む</button><input type="file" id="importFile" accept="application/json,.json" hidden></div>
+   <p class="muted" style="font-size:12px;margin:0">最後のバックアップ：${esc(lsGet('fk-backup-at','')?lsGet('fk-backup-at','').slice(0,10):'まだありません')}</p></section>`;
+  h+=installSection();
+  const hasSample=COLLS.some(c=>S.data[c].some(x=>x.sample));
+  h+=`<section class="block"><h3>サンプルデータ</h3><div class="row">${hasSample?'<button class="btn danger" id="clearSample">サンプルをすべて削除</button>':'<button class="btn" id="loadSample">サンプルデータを読み込む</button>'}</div><p class="muted" style="font-size:12px;margin:0">サンプルは名前に「例）」が付いた架空のデータです。</p></section>`;
+  return h;
+}
+after.team=()=>{
+  const b=(id,fn)=>{const el=$('#'+id);if(el)el.addEventListener('input',()=>fn(el.value))};
+  b('np-name',v=>NP.name=v);b('np-grade',v=>NP.grade=v);b('tm-name',v=>{UI.teamName=v;lsSet('fk-team',v)});
+};
+
+/* ============ AI（Claude）への相談 ============ */
+const BOOK_PRINCIPLES=`あなたはソフトテニス指導書『復元力』（朴相俊 著）の考え方で助言するコーチ補佐です。原則：
+- 技術は「正しさ」より「再現性」。崩れても戻れる「戻り道」を設計する。ねらい（意図）を揃える。
+- 前衛は点を取る人ではなく相手の選択肢を歪める人。60点の関与。守る/待つ/消す/仕掛けるの4モード。出られなかった自分を責めない。
+- 後衛は展開を選び続ける判断。続ける/変える/時間をつくる/主導権の4モード。深さ→速さ→高さの優先順位。
+- ミスは設計・実行・情報・成長の4種類で読む。
+- メンタルは才能ではなく設計。自信ではなく信頼。切り替えではなく時間の分離（今やること／あとでやること）。
+- 声かけは気合いではなく行動を選べる形に整える言葉。「気持ちで負けるな」「切り替えろ」等は使わない。短く、評価より安全基地。
+- 努力は直線ではない。結果ではなく過程（戻れた回数など）を評価する。
+日本語で、高校生にも伝わる短い言葉で答えてください。`;
+async function askAI(prompt,outEl){
+  if(!S.sample){outEl.innerHTML='';return}
+  outEl.innerHTML='<div class="ai-out">考えています…</div>';const box=outEl.firstChild;
+  try{
+    const r=await S.sample(BOOK_PRINCIPLES+'\n\n'+prompt,{onText:({text})=>{box.textContent=text},modelTier:'quick'});
+    box.textContent=r.text;
+  }catch(e){
+    if(e&&e.code==='not_granted'){outEl.innerHTML='';S.sample=null;render();return}
+    box.textContent=e&&e.code==='rate_limited'?'少し時間をおいてから試してください。':'今は答えを受け取れませんでした。';
+  }
+}
+function matchDigest(m){
+  const M=metrics(m.points||[]);const sc=score(m.points||[],m.games);
+  return `スコア ${sc.gA}-${sc.gB}（${sc.need*2-1}ゲームマッチ）、ポイント取得率${M.winRate}%、連続失点ストップ率${M.stop2}%、最長連続失点${M.maxStreak}、ミス後の復帰率${M.recov}%。自分たちのミス内訳：${Object.entries(M.miss).map(e=>e[0]+e[1]).join('、')}。前衛モード：${Object.entries(M.f).map(([k,o])=>k+o.w+'/'+o.n).join('、')||'記録なし'}。後衛モード：${Object.entries(M.b).map(([k,o])=>k+o.w+'/'+o.n).join('、')||'記録なし'}。相手の不自由サイン${M.signs}回。ズレ・ログ：${(m.zure||[]).map(z=>z.t).join('／')||'なし'}。`;
+}
+
+/* ============ サンプル ============ */
+function seeded(seed){return ()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646}}
+async function loadSample(){
+  const rnd=seeded(42);const pick=a=>a[Math.floor(rnd()*a.length)];
+  const p1={id:'ex-p1',name:'例）前衛 ひなた',pos:'前衛',grade:'2年',sample:true},p2={id:'ex-p2',name:'例）後衛 そうま',pos:'後衛',grade:'2年',sample:true};
+  const pair={id:'ex-pair',sample:true,name:'例）ひなた・そうま',front:p1.id,back:p2.id,owners:{quality:'後衛',entry:'前衛',hard:'後衛',air:'前衛'},rules:['迷ったら、深さを優先する','ミドルの深いボール・ロブ処理は後衛優先','2本整えてから勝負'],modoru:'クロス深く2本 → 前衛はセンターを締めて消す',aikotoba:['戻ろう','まず1本','任せた'],kuzure:{back:'まず深さと高さで「時間」をつくる',front:'まず「消す」「触る」で関与する',both:'合言葉で基本に戻す（会話しない）'}};
+  const mkPoints=(bias,n)=>{const pts=[];for(let i=0;i<n;i++){const w=rnd()<bias?1:0;const p={w};
+    p.end=pick(END_OPTS.filter(o=>o.w===w)).k;if(isOwnMiss(p))p.miss=pick(['設計','実行','実行','情報','成長']);
+    if(rnd()<.7)p.f=pick(['守る','待つ','消す','消す','仕掛ける']);if(rnd()<.7)p.b=pick(['続ける','続ける','変える','時間','主導権']);
+    if(rnd()<.35)p.s=[pick(SIGNS)];pts.push(p)}return pts};
+  const fill=(bias,games)=>{let pts=[];while(!score(pts,games).done){pts=pts.concat(mkPoints(bias,1))}return pts};
+  const m1={id:'ex-m1',sample:true,date:'2026-10-12',pairId:pair.id,opponent:'例）県大会 1回戦',games:7,recorder:'マネージャー',points:fill(.5,7),zure:[{t:'ロブが上がったとき、二人とも下がった',g:1,done:true}],finished:true,note:''};
+  const m2={id:'ex-m2',sample:true,date:'2026-10-26',pairId:pair.id,opponent:'例）練習試合 〇〇高',games:7,recorder:'監督',points:fill(.46,7),zure:[{t:'前衛が出たのに後衛も配球を変えた',g:2,done:false}],finished:true,note:''};
+  const dates=['2026-10-05','2026-10-12','2026-10-15','2026-10-19','2026-10-22','2026-10-26','2026-10-29'];
+  const refl=dates.map((d,i)=>({id:'ex-r'+i,sample:true,date:d,player:p2.id,matchId:d==='2026-10-12'?m1.id:d==='2026-10-26'?m2.id:'',role:'後衛',nerai:pick(['相手後衛を後ろに下げ続ける','深いクロスで前衛が触れる形をつくる','ミス後もクロス深くに戻る']),miss:{'設計':Math.floor(rnd()*3),'実行':Math.floor(rnd()*4),'情報':Math.floor(rnd()*2),'成長':Math.floor(rnd()*2)},proc:{modoreta:[1,2,1,3,2,4,3][i],onaji:[1,1,2,1,3,2,4][i],ippo:[0,1,0,1,1,1,2][i]},cond:{out:3,acc:3,judge:3},front:{mamoreta:'',riyuu:'',joken:''},mamotta:pick(['連続ミスのあとも深さだけは守れた','苦しいときに高さで時間をつくれた','']),next:pick(['迷ったらクロス深く','2本整えてから勝負','ミス後は同じねらいに戻る']),coach:i===5?'崩れてからの戻りが早くなっている。次も「深く1本」から。':''}));
+  refl.push({id:'ex-rf',sample:true,date:'2026-10-26',player:p1.id,matchId:m2.id,role:'前衛',nerai:'相手後衛の逆クロスを消し続ける',miss:{'設計':1,'実行':1,'情報':2,'成長':1},proc:{modoreta:2,onaji:2,ippo:1},cond:{out:3,acc:3,judge:3},front:{mamoreta:'センターを締めて抜かれなかった',riyuu:'相手の構えが強く、味方後衛も苦しかった',joken:'相手後衛の打点が遅れたら'},mamotta:'出られなかった後も位置選定を続けた',next:'「被った！」のひとり言で構えを読む',coach:''});
+  const mkCheck=(id,by,player,date,rate)=>({id,sample:true,by,player,date,v:CHECK.map(()=>[0,1,2,3,4].map(()=>rnd()<rate))});
+  const checks=[mkCheck('ex-c1','本人',p2.id,'2026-10-20',.7),mkCheck('ex-c2','監督',p2.id,'2026-10-21',.5),mkCheck('ex-c3','本人',p1.id,'2026-10-20',.5)];
+  for(const p of [p1,p2])await saveDoc('players',p);
+  await saveDoc('pairs',pair);await saveDoc('matches',m1);await saveDoc('matches',m2);
+  for(const r of refl)await saveDoc('reflections',r);for(const c of checks)await saveDoc('checks',c);
+  UI.reflPlayer=p2.id;UI.checkPlayer=p2.id;toast('サンプルを読み込みました');render();
+}
+async function clearSample(){for(const c of COLLS)for(const x of S.data[c].filter(x=>x.sample))await delDoc(c,x.id);toast('サンプルを削除しました');render()}
+
+/* ============ イベント ============ */
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('button');if(!t)return;
+  if(t.dataset.go){if(t.dataset.go==='match'){UI.analysisId=null}go(t.dataset.go);return}
+  if(t.id==='loadSample'){t.disabled=true;await loadSample();return}
+  if(t.id==='clearSample'){await clearSample();return}
+  if(t.dataset.analysis){UI.analysisId=t.dataset.analysis;go('match');return}
+  if(t.dataset.copy){const s=t.dataset.copy;try{await navigator.clipboard.writeText(s);toast('コピーしました')}catch(err){toast(s)}return}
+  // チップ
+  if(t.dataset.chip){chipClick(t.dataset.chip,t.dataset.val);return}
+  if(t.dataset.step){const [a,b]=t.dataset.step.split('.');REFL[a][b]=Math.max(0,(REFL[a][b]||0)+(+t.dataset.d));render();return}
+  // 試合
+  const m=curMatch();
+  if(t.id==='startMatch'){
+    if(!NEW_MATCH.pairId&&!S.data.pairs.length){/* ペア未作成でも記録可 */}
+    const nm={date:NEW_MATCH.date||today(),pairId:NEW_MATCH.pairId,opponent:NEW_MATCH.opponent,games:+NEW_MATCH.games||7,recorder:NEW_MATCH.recorder,points:[],zure:[],finished:false};
+    await saveDoc('matches',nm);UI.matchId=nm.id;UI.rv=[];UI.showEnd=false;render();return}
+  if(t.dataset.resume){UI.matchId=t.dataset.resume;UI.showEnd=false;render();return}
+  if((t.id==='ptW'||t.id==='ptL')&&m){
+    const before=score(m.points,m.games);
+    m.points.push({w:t.id==='ptW'?1:0});
+    const sc=score(m.points,m.games);
+    if(sc.game>before.game&&!sc.done&&sc.game%2===1)UI.showEnd=true;
+    UI.rv=[];saveDoc('matches',m,800);render();return}
+  if(t.id==='undo'&&m){m.points.pop();UI.showEnd=false;saveDoc('matches',m,800);render();return}
+  if(t.id==='zureAdd'&&m){const v=$('#zureIn').value.trim();if(!v)return;m.zure=m.zure||[];m.zure.push({t:v,g:score(m.points,m.games).game,done:false});saveDoc('matches',m,300);render();return}
+  if(t.dataset.zure&&m){const z=m.zure[+t.dataset.zure];z.done=!z.done;saveDoc('matches',m,300);render();return}
+  if(t.id==='showEnd'){UI.showEnd=true;render();return}
+  if(t.id==='closeEnd'){UI.showEnd=false;render();return}
+  if(t.id==='aiEnd'&&m){askAI(`試合中のエンドチェンジです。ここまでの記録：${matchDigest(m)}\nこのペアに、次のゲームで伝える「ひとつだけ」の声かけ案を3つ、各20字以内で。最後に理由を1行。`,$('#aiEndOut'));return}
+  if(t.id==='finish'&&m){m.finished=true;await saveDoc('matches',m);UI.analysisId=m.id;UI.matchId=null;render();return}
+  if(t.id==='abort'){UI.matchId=null;render();return}
+  if(t.id==='backList'){UI.analysisId=null;render();return}
+  const am=S.data.matches.find(x=>x.id===UI.analysisId);
+  if(t.id==='saveNote'&&am){am.note=$('#am-note').value;await saveDoc('matches',am);toast('保存しました');return}
+  if(t.id==='aiMatch'&&am){askAI(`試合後の振り返りです。記録：${matchDigest(am)}\n監督が試合後に伝えるべきことを、①技術（再現性）②判断（役割モード）③ペア（戻り道）の順に、各1〜2行で。最後に選手へのひと言（生かす声かけ）を1つ。`,$('#aiMatchOut'));return}
+  if(t.id==='delMatch'&&am){if(t.dataset.confirm!=='1'){t.dataset.confirm='1';t.textContent='もう一度押すと削除';return}await delDoc('matches',am.id);UI.analysisId=null;render();return}
+  // ペア
+  if(t.id==='newPair'){PAIR_DRAFT=newPairDraft();render();return}
+  if(t.dataset.editpair){const p=S.data.pairs.find(x=>x.id===t.dataset.editpair);PAIR_DRAFT=Object.assign(newPairDraft(),JSON.parse(JSON.stringify(p)));render();return}
+  if(t.dataset.delpair){if(t.dataset.confirm!=='1'){t.dataset.confirm='1';t.textContent='もう一度押すと削除';return}await delDoc('pairs',t.dataset.delpair);return}
+  if(t.id==='addRule'){const v=PAIR_DRAFT.customRule.trim();if(v&&!PAIR_DRAFT.rules.includes(v))PAIR_DRAFT.rules.push(v);PAIR_DRAFT.customRule='';render();return}
+  if(t.id==='addWord'){const v=PAIR_DRAFT.customWord.trim();if(v&&!PAIR_DRAFT.aikotoba.includes(v))PAIR_DRAFT.aikotoba.push(v);PAIR_DRAFT.customWord='';render();return}
+  if(t.id==='cancelPair'){PAIR_DRAFT=null;render();return}
+  if(t.id==='savePair'){const d=PAIR_DRAFT;
+    if(!d.name.trim()){const f=S.data.players.find(p=>p.id===d.front),b=S.data.players.find(p=>p.id===d.back);d.name=[f&&f.name,b&&b.name].filter(Boolean).join('・')||'名前のないペア'}
+    const o=Object.assign({},d);delete o.customRule;delete o.customWord;await saveDoc('pairs',o);PAIR_DRAFT=null;toast('ペアを保存しました');render();return}
+  // 振り返り
+  if(t.id==='newRefl'){REFL=newRefl(UI.reflPlayer);render();return}
+  if(t.dataset.editrefl){REFL=Object.assign(newRefl(),JSON.parse(JSON.stringify(S.data.reflections.find(x=>x.id===t.dataset.editrefl))));render();return}
+  if(t.id==='cancelRefl'){REFL=null;render();return}
+  if(t.id==='saveRefl'){REFL.player=UI.reflPlayer;await saveDoc('reflections',REFL);REFL=null;toast('振り返りを保存しました');render();return}
+  if(t.id==='delRefl'){if(t.dataset.confirm!=='1'){t.dataset.confirm='1';t.textContent='もう一度押すと削除';return}await delDoc('reflections',REFL.id);REFL=null;render();return}
+  if(t.dataset.airefl){const r=S.data.reflections.find(x=>x.id===t.dataset.airefl);
+    askAI(`選手（${r.role}）の振り返り：ねらい「${r.nerai}」、崩れても戻れた${r.proc.modoreta}回、同じねらいに戻れた${r.proc.onaji}回、怖さを超えた一歩${r.proc.ippo}回、ミス 設計${r.miss['設計']}・実行${r.miss['実行']}・情報${r.miss['情報']}・成長${r.miss['成長']}、今日守れたもの「${r.mamotta}」、次の一つ「${r.next}」${r.role==='前衛'?`、出なかったことで守れたもの「${r.front.mamoreta}」、条件が揃わなかった理由「${r.front.riyuu}」、次に出る条件「${r.front.joken}」`:''}。\n監督がこの選手に返すコメント案を、過程の進歩を言語化する形で2〜3文。続けて次の練習で試す「一つだけ」を1行。`,$('#ai-'+r.id));return}
+  // チェック
+  if(t.id==='newCheck'){CHK={date:today(),v:CHECK.map(()=>[0,0,0,0,0].map(()=>false))};render();return}
+  if(t.id==='cancelCheck'){CHK=null;render();return}
+  if(t.id==='saveCheck'){await saveDoc('checks',{date:CHK.date,by:UI.checkBy,player:UI.checkPlayer,v:CHK.v});CHK=null;toast('チェックを保存しました');render();return}
+  if(t.dataset.delcheck){if(t.dataset.confirm!=='1'){t.dataset.confirm='1';t.textContent='もう一度';return}await delDoc('checks',t.dataset.delcheck);return}
+  // 選手
+  if(t.id==='addPlayer'){const n=NP.name.trim();if(!n){toast('名前を入力してください');return}await saveDoc('players',{name:n,pos:NP.pos,grade:NP.grade.trim()});NP={name:'',pos:NP.pos,grade:''};toast('追加しました');render();return}
+  if(t.dataset.delplayer){if(t.dataset.confirm!=='1'){t.dataset.confirm='1';t.textContent='もう一度押すと削除';return}await delDoc('players',t.dataset.delplayer);return}
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset.rv!=null){UI.rv=UI.rv||[];UI.rv[+t.dataset.rv]=t.checked;$('#rvOut').innerHTML=rallyVerdict();return}
+  if(t.dataset.ck&&CHK){const [i,j]=t.dataset.ck.split('-').map(Number);CHK.v[i][j]=t.checked;return}
+});
+function chipClick(name,val){
+  const m=curMatch();
+  if(m&&['end','miss','f','b','s'].includes(name)){
+    const p=m.points[m.points.length-1];if(!p)return;
+    if(name==='s'){p.s=p.s||[];p.s=p.s.includes(val)?p.s.filter(x=>x!==val):p.s.concat(val)}
+    else{p[name]=p[name]===val?'':val;if(name==='end'&&!isOwnMiss(p))delete p.miss}
+    saveDoc('matches',m,800);render();return}
+  if(PAIR_DRAFT){
+    if(name.startsWith('own-')){PAIR_DRAFT.owners[name.slice(4)]=val;render();return}
+    if(name==='rule'){const r=PAIR_DRAFT.rules;PAIR_DRAFT.rules=r.includes(val)?r.filter(x=>x!==val):r.concat(val);render();return}
+    if(name==='word'){const r=PAIR_DRAFT.aikotoba;PAIR_DRAFT.aikotoba=r.includes(val)?r.filter(x=>x!==val):r.concat(val);render();return}
+  }
+  if(name==='role'&&REFL){REFL.role=val;render();return}
+  if(name==='ckby'){UI.checkBy=val;CHK=null;render();return}
+  if(name==='np-pos'){NP.pos=val;render();return}
+}
+window.addEventListener('hashchange',()=>{const r=location.hash.replace('#','');if(TABS.some(t=>t[0]===r))go(r)});
+
+/* ============ PWA：インストール・バックアップ ============ */
+let installEvt=null;
+const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if(route==='team')render()});
+window.addEventListener('appinstalled',()=>{installEvt=null;toast('ホーム画面に追加しました');if(route==='team')render()});
+function installSection(){
+  if(isStandalone())return `<section class="block"><h3>アプリ</h3><p class="muted" style="font-size:13px;margin:0">ホーム画面のアプリとして起動しています。電波のないコートでも使えます。</p></section>`;
+  let body;
+  if(installEvt)body=`<button class="btn primary" id="installApp">このアプリをインストール</button>`;
+  else if(isIOS)body=`<ol style="margin:0;padding-left:20px;font-size:14px"><li>Safariの下にある共有ボタン（□に↑）をタップ</li><li>「ホーム画面に追加」を選ぶ</li><li>右上の「追加」をタップ</li></ol>`;
+  else body=`<p style="font-size:14px;margin:0">ブラウザのメニュー（︙）から「アプリをインストール」または「ホーム画面に追加」を選んでください。</p>`;
+  return `<section class="block"><h3>ホーム画面に追加</h3>${body}<p class="muted" style="font-size:12px;margin:0">追加すると全画面で起動し、オフラインでも使えます。</p></section>`;
+}
+function backupJSON(){return JSON.stringify({app:'doubles-compass',version:1,exportedAt:new Date().toISOString(),team:UI.teamName,data:S.data},null,1)}
+async function exportData(){
+  const name='doubles-compass-'+today()+'.json';
+  const file=new File([backupJSON()],name,{type:'application/json'});
+  try{
+    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'ダブルス・コンパスのデータ'})}
+    else{const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+    lsSet('fk-backup-at',new Date().toISOString());toast('書き出しました');render();
+  }catch(e){if(e&&e.name==='AbortError')return;toast('書き出せませんでした')}
+}
+async function importData(file){
+  let j;try{j=JSON.parse(await file.text())}catch(e){toast('ファイルを読み取れませんでした');return}
+  if(!j||j.app!=='doubles-compass'||!j.data){toast('ダブルス・コンパスのファイルではありません');return}
+  let added=0,updated=0;
+  COLLS.forEach(k=>{(j.data[k]||[]).forEach(x=>{if(!x||!x.id)return;
+    const i=S.data[k].findIndex(y=>y.id===x.id);
+    if(i<0){S.data[k].push(x);added++}
+    else if((x.updatedAt||'')>(S.data[k][i].updatedAt||'')){S.data[k][i]=x;updated++}
+  })});
+  if(!UI.teamName&&j.team){UI.teamName=j.team;lsSet('fk-team',j.team)}
+  lsSet(LS_KEY,S.data);toast(`読み込みました（追加${added}件・更新${updated}件）`);render();
+}
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('button');if(!t)return;
+  if(t.id==='exportData')exportData();
+  if(t.id==='importBtn')$('#importFile').click();
+  if(t.id==='installApp'&&installEvt){installEvt.prompt();await installEvt.userChoice;installEvt=null;render()}
+});
+document.addEventListener('change',e=>{if(e.target.id==='importFile'&&e.target.files[0]){importData(e.target.files[0]);e.target.value=''}});
+if('serviceWorker' in navigator&&location.protocol!=='file:'){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+
+render();
+initStore();
+</script>
+</body>
+</html>
